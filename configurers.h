@@ -301,12 +301,14 @@ namespace dmk
                     m_project->output_dir( project::dir::configure, arch, config, m_project_name );
             }
             create_directories( m_configure_dir );
+            path lib_dir = m_project->output_dir( project::dir::libraries, m_arch, m_config );
+            path bin_dir = m_project->output_dir( project::dir::binaries, m_arch, m_config );
+            create_directories( lib_dir );
+            create_directories( bin_dir );
 
 #if defined DMK_BUILDER_DEBUG
             {
                 debug_text c;
-                path lib_dir = m_project->output_dir( project::dir::libraries, m_arch, m_config );
-                path bin_dir = m_project->output_dir( project::dir::binaries, m_arch, m_config );
                 println( "prepare( {}, {} )", m_arch.name, m_config.name );
                 println( "    configure_dir = {}", m_configure_dir.string( ) );
                 println( "    lib_dir = {}", bin_dir.string( ) );

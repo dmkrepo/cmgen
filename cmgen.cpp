@@ -194,6 +194,7 @@ namespace dmk
             create_directories( target_dir );
             path target_file = target_dir / target_name;
             println( "Copying file {} -> {}", file, target_file );
+            fix_write_rights( target_file );
             copy( file, target_file, copy_options::overwrite_existing );
         }
 
