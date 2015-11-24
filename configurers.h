@@ -196,7 +196,8 @@ namespace dmk
 #if !defined DMK_BUILDER_NOP
                 if ( m_insource )
                 {
-                    println( "In-source build: {}", m_configure_dir );
+                    if ( !build_process::quiet )
+                        println( "In-source build: {}", m_configure_dir );
                     copy_content( m_original_source_dir, m_configure_dir );
                     m_source_dir = m_configure_dir;
                 }
@@ -277,10 +278,7 @@ namespace dmk
         // Default action is to clean build directory
         virtual void do_build_clean( )
         {
-            path lib_dir = m_project->output_dir( project::dir::libraries, m_arch, m_config );
-            path bin_dir = m_project->output_dir( project::dir::binaries, m_arch, m_config );
-            remove_content( lib_dir );
-            remove_content( bin_dir );
+            project::remove_built( m_project_name, m_arch, m_config );
         }
 
         // Set internal variables
@@ -303,16 +301,23 @@ namespace dmk
             create_directories( m_configure_dir );
             path lib_dir = m_project->output_dir( project::dir::libraries, m_arch, m_config );
             path bin_dir = m_project->output_dir( project::dir::binaries, m_arch, m_config );
+            path inc_dir = m_project->output_dir( project::dir::includes, m_arch, m_config );
+            path out_dir = m_project->output_dir( project::dir::install, m_arch, m_config );
             create_directories( lib_dir );
             create_directories( bin_dir );
+            create_directories( inc_dir );
+            create_directories( out_dir );
 
 #if defined DMK_BUILDER_DEBUG
+            if ( !build_process::quiet )
             {
                 debug_text c;
                 println( "prepare( {}, {} )", m_arch.name, m_config.name );
                 println( "    configure_dir = {}", m_configure_dir.string( ) );
                 println( "    lib_dir = {}", bin_dir.string( ) );
                 println( "    bin_dir = {}", lib_dir.string( ) );
+                println( "    inc_dir = {}", inc_dir.string( ) );
+                println( "    out_dir = {}", out_dir.string( ) );
                 println( "data:\n{}", m_data.stringify( ) );
             }
 #endif
@@ -346,18 +351,20 @@ namespace dmk
         }
         virtual void do_configure( ) override
         {
-            println( "Project {} has prebuilt binaries. No need to configure it", m_project_name );
+            if ( !build_process::quiet )
+                println( "Project {} has prebuilt binaries. No need to configure it", m_project_name );
         }
         virtual void do_build( ) override
         {
-            println( "Project {} has prebuilt binaries. No need to build it", m_project_name );
+            if ( !build_process::quiet )
+                println( "Project {} has prebuilt binaries. No need to build it", m_project_name );
         }
     };
 
-    struct cmake_console : public process
+    struct cmake_console : public build_process
     {
     public:
-        cmake_console( const path& working_dir ) : process( env->cmake_path, working_dir )
+        cmake_console( const path& working_dir ) : build_process( env->cmake_path, working_dir )
         {
         }
         cmake_console& D( const std::string& name, bool value )
@@ -429,6 +436,8 @@ namespace dmk
             cmake.D( "CMGEN_FLAGS", flags );
             cmake.D( "CMGEN_DEFINES", defines );
             cmake.D( "CMAKE_PREFIX_PATH", env->modules_dir );
+            cmake.D( "CMAKE_INSTALL_PREFIX",
+                     m_project->output_dir( project::dir::install, m_arch, m_config ) );
             if ( get_kind( ) == SingleConfig )
             {
                 cmake.D( "CMAKE_BUILD_TYPE", m_config.name );
@@ -447,11 +456,20 @@ namespace dmk
         }
         virtual void do_build( ) override
         {
-            exec( m_configure_dir, env->cmake_path, "--build . --config {} ", m_config.name );
+            exec<build_process>( m_configure_dir, env->cmake_path, "--build . --config {} ", m_config.name );
+            bool install = m_data["cmakeinstall"] || 0;
+            if ( install )
+            {
+                exec<build_process>( m_configure_dir,
+                                     env->cmake_path,
+                                     "-DCMAKE_INSTALL_CONFIG_NAME={} -P cmake_install.cmake",
+                                     m_config.name );
+            }
         }
         virtual void do_build_clean( ) override
         {
-            exec( m_configure_dir, env->cmake_path, "--build . --config {} --target clean", m_config.name );
+            exec<build_process>(
+                m_configure_dir, env->cmake_path, "--build . --config {} --target clean", m_config.name );
         }
     };
 
@@ -463,17 +481,17 @@ namespace dmk
         friend class builder;
         virtual void do_build( ) override
         {
-            exec( m_configure_dir,
-                  env->scons_path,
-                  "--{} {}",
-                  m_arch.bitness,
-                  join( m_data["options"].flatten( ), " " ) );
+            exec<build_process>( m_configure_dir,
+                                 env->scons_path,
+                                 "--{} {}",
+                                 m_arch.bitness,
+                                 join( m_data["options"].flatten( ), " " ) );
 
-            exec( m_configure_dir,
-                  env->scons_path,
-                  "--{} {} install",
-                  m_arch.bitness,
-                  join( m_data["options"].flatten( ), " " ) );
+            exec<build_process>( m_configure_dir,
+                                 env->scons_path,
+                                 "--{} {} install",
+                                 m_arch.bitness,
+                                 join( m_data["options"].flatten( ), " " ) );
         }
     };
 
@@ -489,7 +507,7 @@ namespace dmk
             command = m_project->source_dir( ) / command;
             if ( !is_file( command ) )
                 return;
-            process cmd( command, m_configure_dir );
+            build_process cmd( command, m_configure_dir );
 
             variable_list list =
                 env->variables + m_project->public_variables( m_arch, m_config ) + dynamic_variables( );
@@ -503,7 +521,7 @@ namespace dmk
             command = m_project->source_dir( ) / command;
             if ( !is_file( command ) )
                 return;
-            process cmd( command, m_configure_dir );
+            build_process cmd( command, m_configure_dir );
 
             variable_list vars =
                 env->variables + m_project->public_variables( m_arch, m_config ) + dynamic_variables( );
@@ -533,7 +551,7 @@ namespace dmk
         virtual void do_configure( ) override
         {
             path qmakefile = get_qmakefile( );
-            process cmd( env->configure_qmake_path, m_configure_dir );
+            build_process cmd( env->configure_qmake_path, m_configure_dir );
 
             variable_list vars =
                 env->variables + m_project->public_variables( m_arch, m_config ) + dynamic_variables( );
@@ -544,7 +562,7 @@ namespace dmk
         virtual void do_build( ) override
         {
             path qmakefile = get_qmakefile( );
-            process cmd( env->build_qmake_path, m_configure_dir );
+            build_process cmd( env->build_qmake_path, m_configure_dir );
 
             variable_list vars =
                 env->variables + m_project->public_variables( m_arch, m_config ) + dynamic_variables( );

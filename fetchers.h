@@ -33,14 +33,12 @@ namespace dmk
         {
             console_title ct( true, "Fetching {}...", m_project->name( ) );
             do_fetch( );
-            bool printed = false;
             for ( auto t : m_temporaries )
             {
                 yellow_text c;
-                if ( !printed )
+                if ( !build_process::quiet )
                 {
                     println( "Removing temporary {}", t.string( ) );
-                    printed = true;
                 }
                 safe_remove_all( t );
             }
@@ -72,18 +70,44 @@ namespace dmk
         {
             if ( is_directory( m_destination / ".git" ) )
             {
-                exec( m_destination, env->git_path, "pull" );
+                exec<build_process>( m_destination, env->git_path, "pull" );
             }
             else
             {
                 std::string url    = m_package["url"] || "";
                 std::string branch = m_package["branch"] || "master";
-                exec( m_destination.parent_path( ),
-                      env->git_path,
-                      "clone -b {} --single-branch --depth 1 {} {}",
-                      qo( branch ),
-                      url,
-                      m_destination.filename( ) );
+                exec<build_process>( m_destination.parent_path( ),
+                                     env->git_path,
+                                     "clone -b {} --single-branch --depth 1 {} {}",
+                                     qo( branch ),
+                                     url,
+                                     m_destination.filename( ) );
+            }
+        }
+    };
+
+    // Clone hg repository
+    class hg_fetcher : public fetcher
+    {
+    protected:
+        using fetcher::fetcher;
+        friend class fetcher;
+        virtual void do_fetch( ) override
+        {
+            if ( is_directory( m_destination / ".hg" ) )
+            {
+                exec<build_process>( m_destination, env->hg_path, "pull" );
+            }
+            else
+            {
+                std::string url    = m_package["url"] || "";
+                std::string branch = m_package["branch"] || "default";
+                exec<build_process>( m_destination.parent_path( ),
+                                     env->hg_path,
+                                     "clone -b {} {} {}",
+                                     qo( branch ),
+                                     url,
+                                     m_destination.filename( ) );
             }
         }
     };
@@ -111,7 +135,8 @@ namespace dmk
             path tmpfolder = unique_path( env->temp_dir, "", "tmpfolder%04d" );
             create_directory( tmpfolder );
             path tmpfile = tmpfolder / filename;
-            exec( tmpfolder, env->curl_path, "-o {} -L {}", qo( tmpfile ), qo( url ) );
+            exec<build_process>(
+                tmpfolder, env->curl_path, "-o {} -L {} --stderr -", qo( tmpfile ), qo( url ) );
             m_temporaries.push_back( tmpfolder );
             return tmpfile;
         }
@@ -129,12 +154,12 @@ namespace dmk
             path tmpfile     = download( );
             int strip_levels = m_package["strip"] || 1;
 
-            exec( m_destination,
-                  env->tar_path,
-                  "-xf {} --strip={} -C {}",
-                  qo( tmpfile ),
-                  strip_levels,
-                  qo( target_dir ) );
+            exec<build_process>( m_destination,
+                                 env->tar_path,
+                                 "-xf {} --strip={} -C {}",
+                                 qo( tmpfile ),
+                                 strip_levels,
+                                 qo( target_dir ) );
         }
     };
 
@@ -153,7 +178,8 @@ namespace dmk
 
             path target_tmp_dir = target_dir / "tmp-zip";
             create_directories( target_tmp_dir );
-            exec( m_destination, env->unzip_path, "-q {} -d {}", qo( tmpfile ), qo( target_tmp_dir ) );
+            exec<build_process>(
+                m_destination, env->unzip_path, "-q {} -d {}", qo( tmpfile ), qo( target_tmp_dir ) );
 
             if ( strip_levels == 0 )
                 move_content( target_tmp_dir, target_dir );
@@ -184,15 +210,17 @@ namespace dmk
             {
                 path tar_file = tmpfile;
                 tar_file.replace_extension( );
-                exec( tmpfile.parent_path( ), env->sevenzip_path, "x {}", qo( tmpfile ) );
+                exec<build_process>( tmpfile.parent_path( ), env->sevenzip_path, "x {}", qo( tmpfile ) );
                 m_temporaries.push_back( tar_file );
                 // stage 1:
                 // stage 2: unpack tar
-                exec( m_destination, env->sevenzip_path, "x -o{} {}", qo( target_tmp_dir ), qo( tar_file ) );
+                exec<build_process>(
+                    m_destination, env->sevenzip_path, "x -o{} {}", qo( target_tmp_dir ), qo( tar_file ) );
             }
             else
             {
-                exec( m_destination, env->sevenzip_path, "x -o{} {}", qo( target_tmp_dir ), qo( tmpfile ) );
+                exec<build_process>(
+                    m_destination, env->sevenzip_path, "x -o{} {}", qo( target_tmp_dir ), qo( tmpfile ) );
             }
 
             if ( strip_levels == 0 )
@@ -214,7 +242,7 @@ namespace dmk
         {
             std::string command = m_package["command"] || "";
             path tmpfile = download( );
-            exec( m_destination, tmpfile, command );
+            exec<build_process>( m_destination, tmpfile, command );
         }
     };
 
@@ -246,11 +274,11 @@ namespace dmk
         virtual void do_fetch( ) override
         {
             std::string url = m_package["url"] || "";
-            exec( m_destination,
-                  env->wget_path,
-                  "-m -np -nH --cut-dirs={} {}",
-                  count_substr( url, '/' ) - 3,
-                  qo( url ) );
+            exec<build_process>( m_destination,
+                                 env->wget_path,
+                                 "-m -np -nH --cut-dirs={} {}",
+                                 count_substr( url, '/' ) - 3,
+                                 qo( url ) );
         }
     };
 
@@ -289,6 +317,10 @@ namespace dmk
             else if ( type == "git" )
             {
                 return ptr<fetcher>( new git_fetcher( proj, package, destination ) );
+            }
+            else if ( type == "hg" )
+            {
+                return ptr<fetcher>( new hg_fetcher( proj, package, destination ) );
             }
             else if ( type == "archive" )
             {

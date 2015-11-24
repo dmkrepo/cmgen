@@ -32,6 +32,53 @@
 
 namespace dmk
 {
+
+    struct build_process : public process
+    {
+    public:
+        explicit build_process( const path& program, const path& working_dir = current_path( ) )
+            : process( program, working_dir )
+        {
+            log_output( quiet );
+        }
+        static bool quiet;
+
+    protected:
+        virtual void before( ) override
+        {
+            create_directories( m_working_dir );
+            if ( !quiet )
+            {
+                {
+                    debug_text c;
+                    println( m_working_dir.string( ) );
+                }
+                {
+                    cyan_text c;
+                    println( m_program.filename( ).string( ) + ' ' + m_args );
+                }
+            }
+        }
+        virtual void log_path( path& stdout_log, path& stderr_log ) override
+        {
+            char buff[64];
+            std::string title = console_title::get( );
+            title             = replace_all( title, "...", "" );
+            title             = replace_all_not_of( title, " \\|/:;<>~?*\"", '_' );
+
+            std::time_t time = std::time( NULL );
+            std::tm* tm = std::localtime( &time );
+            std::strftime( buff, countof( buff ), "%Y%m%d-%H%M%S", tm );
+
+            stdout_log = unique_path( temp_directory_path( ),
+                                      ".stdout.log",
+                                      title + "_" + m_program.filename( ).string( ) + buff + "-%04d" );
+            stderr_log = unique_path( temp_directory_path( ),
+                                      ".stderr.log",
+                                      title + "_" + m_program.filename( ).string( ) + buff + "-%04d" );
+        }
+    };
+
     template <typename _Type>
     using ptr = std::shared_ptr<_Type>;
 
@@ -44,7 +91,8 @@ namespace dmk
 
     inline void safe_copy_all( const path& source, const path& target, int depth = 0 )
     {
-        fmt::print( "{: <79}\r", source.string( ).substr( 0, 79 ) );
+        if ( !build_process::quiet )
+            fmt::print( "{: <79}\r", source.string( ).substr( 0, 79 ) );
         try
         {
             if ( is_directory( source ) )
@@ -71,13 +119,15 @@ namespace dmk
         }
         if ( depth == 0 )
         {
-            fmt::print( "{: <79}\r", "" );
+            if ( !build_process::quiet )
+                fmt::print( "{: <79}\r", "" );
         }
     }
 
     inline void safe_remove_all( const path& p, int depth = 0 )
     {
-        fmt::print( "{: <79}\r", p.string( ).substr( 0, 79 ) );
+        if ( !build_process::quiet )
+            fmt::print( "{: <79}\r", p.string( ).substr( 0, 79 ) );
         try
         {
             if ( is_directory( p ) )
@@ -103,44 +153,68 @@ namespace dmk
         }
         if ( depth == 0 )
         {
-            fmt::print( "{: <79}\r", "" );
+            if ( !build_process::quiet )
+                fmt::print( "{: <79}\r", "" );
         }
     }
 
-    inline void move_content( const path& directory, const path& target, bool print = true )
+    inline void move_content( const path& directory, const path& target, bool print = !build_process::quiet )
     {
         yellow_text c;
         create_directories( target );
-        for ( const directory_entry& entry : directory_iterator( directory ) )
+        path p;
+        try
         {
-            if ( print )
+            for ( const directory_entry& entry : directory_iterator( directory ) )
             {
-                println( "Moving directory contents {} -> {}", directory.string( ), target.string( ) );
-                print = false;
-            }
-            rename( entry, target / entry.path( ).filename( ) );
-        }
-    }
-
-    inline void move_content_strip1( const path& directory, const path& target, bool print = true )
-    {
-        yellow_text c;
-        create_directories( target );
-        for ( const directory_entry& entry : directory_iterator( directory ) )
-        {
-            for ( const directory_entry& entry2 : directory_iterator( entry ) )
-            {
+                p = entry;
                 if ( print )
                 {
                     println( "Moving directory contents {} -> {}", directory.string( ), target.string( ) );
                     print = false;
                 }
-                rename( entry2, target / entry2.path( ).filename( ) );
+                safe_remove_all( target / entry.path( ).filename( ) );
+                rename( entry, target / entry.path( ).filename( ) );
             }
+        }
+        catch ( const std::exception& e )
+        {
+            throw error( e, "Can't rename file or directory \"{}\"", p.string( ) );
         }
     }
 
-    inline void remove_content( const path& directory, bool print = true )
+    inline void move_content_strip1( const path& directory,
+                                     const path& target,
+                                     bool print = !build_process::quiet )
+    {
+        yellow_text c;
+        create_directories( target );
+        path p;
+        try
+        {
+            for ( const directory_entry& entry : directory_iterator( directory ) )
+            {
+                for ( const directory_entry& entry2 : directory_iterator( entry ) )
+                {
+                    p = entry2;
+                    if ( print )
+                    {
+                        println(
+                            "Moving directory contents {} -> {}", directory.string( ), target.string( ) );
+                        print = false;
+                    }
+                    safe_remove_all( target / entry2.path( ).filename( ) );
+                    rename( entry2, target / entry2.path( ).filename( ) );
+                }
+            }
+        }
+        catch ( const std::exception& e )
+        {
+            throw error( e, "Can't rename file or directory \"{}\"", p.string( ) );
+        }
+    }
+
+    inline void remove_content( const path& directory, bool print = !build_process::quiet )
     {
         yellow_text c;
         for ( const directory_entry& entry : directory_iterator( directory ) )
@@ -154,7 +228,7 @@ namespace dmk
         }
     }
 
-    inline void remove_directory( const path& directory, bool print = true )
+    inline void remove_directory( const path& directory, bool print = !build_process::quiet )
     {
         remove_content( directory, print );
         if ( is_directory( directory ) && print )
@@ -162,7 +236,7 @@ namespace dmk
         remove( directory );
     }
 
-    inline void copy_content( const path& directory, const path& target, bool print = true )
+    inline void copy_content( const path& directory, const path& target, bool print = !build_process::quiet )
     {
         yellow_text c;
         create_directories( target );
@@ -177,7 +251,9 @@ namespace dmk
         }
     }
 
-    inline void copy_content_hard_link( const path& directory, const path& target, bool print = true )
+    inline void copy_content_hard_link( const path& directory,
+                                        const path& target,
+                                        bool print = !build_process::quiet )
     {
         yellow_text c;
         create_directories( target );
@@ -335,6 +411,7 @@ namespace dmk
         path flags_dir;
         path temp_dir;
         path git_path;
+        path hg_path;
         path tar_path;
         path curl_path;
         path wget_path;
@@ -568,6 +645,7 @@ namespace dmk
             msys_bin_dir  = add_dir( msys_dir / "usr" / "bin", "msys_bin" );
             ext_dir       = add_dir( tools_dir / "ext", "ext" );
             git_path      = add_tool( tools_dir / "PortableGit" / "bin" / "git" DMK_EXEC_EXT, "git" );
+            hg_path       = add_tool( tools_dir / "hg" / "hg" DMK_EXEC_EXT, "hg" );
             cmake_path    = add_tool( tools_dir / "cmake" / "bin" / "cmake" DMK_EXEC_EXT, "cmake" );
             python_path   = add_tool( tools_dir / "python" / "python" DMK_EXEC_EXT, "python" );
             scons_path    = add_tool( tools_dir / "python" / "scons.bat", "scons" );

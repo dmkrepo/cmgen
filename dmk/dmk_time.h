@@ -23,6 +23,7 @@
 #include "dmk_fraction.h"
 #include <windows.h>
 #include <iostream>
+#include <string>
 
 namespace dmk
 {

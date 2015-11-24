@@ -1,5 +1,5 @@
 
-@set PATH=%CMGEN_BIN_ALL_DIR%\qt\bin;%CMGEN_JOM_DIR%;%PATH%
+@set PATH=%CMGEN_INSTALL_ALL_DIR%\qt\bin;%CMGEN_JOM_DIR%;%PATH%
 
 call %CMGEN_EXT_DIR%\compiler_vars.cmd
 

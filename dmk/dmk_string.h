@@ -503,6 +503,18 @@ namespace dmk
         return r;
     }
 
+    inline std::string replace_all_not_of( const std::string& str, const std::string& from, char to )
+    {
+        std::string r    = str;
+        size_t start_pos = 0;
+        while ( ( start_pos = r.find_first_of( from, start_pos ) ) != std::string::npos )
+        {
+            r[start_pos] = to;
+            start_pos++;
+        }
+        return r;
+    }
+
     inline std::string replace_all( const std::string& str, const std::string& from, const std::string& to )
     {
         std::string r    = str;
@@ -896,7 +908,7 @@ namespace dmk
             return matches( pattern.substr( 1 ), text );
         }
         std::string lpattern = asci_lowercase( pattern );
-        std::string ltext    = asci_lowercase( text );
+        std::string ltext = asci_lowercase( text );
         if ( erase_leading( lpattern, '*' ) )
         {
             if ( erase_trailing( lpattern, '*' ) )
@@ -916,7 +928,16 @@ namespace dmk
             }
             else
             {
-                return lpattern == ltext;
+                size_t p = lpattern.find( '*' );
+                if ( p == std::string::npos )
+                {
+                    return lpattern == ltext;
+                }
+                else
+                {
+                    return begins_with( ltext, lpattern.substr( 0, p ) ) &&
+                           ends_with( ltext, lpattern.substr( p + 1 ) );
+                }
             }
         }
     }

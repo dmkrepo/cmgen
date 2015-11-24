@@ -33,7 +33,7 @@
 
 namespace dmk
 {
-    enum text_color : uint8_t
+    enum text_color : uint32_t
     {
         Black         = 0x00,
         DarkBlue      = 0x01,
@@ -71,51 +71,67 @@ namespace dmk
         Normal = BgBlack | LightGrey,
     };
 
-    text_color& get_text_color( )
+    enum console_buffer
     {
-        static text_color current_color = Normal;
-        return current_color;
-    }
+        ConsoleStdOutput,
+        ConsoleStdError
+    };
 
-    void set_text_color( text_color new_color )
+#ifdef DMK_OS_WIN
+    typedef HANDLE console_handle_t;
+
+    inline console_handle_t console_handle( console_buffer console = ConsoleStdOutput )
     {
-        static HANDLE hConsole = ::GetStdHandle( STD_OUTPUT_HANDLE );
-        get_text_color( ) = new_color;
-        SetConsoleTextAttribute( hConsole, new_color );
+        static HANDLE con_out = ::GetStdHandle( STD_OUTPUT_HANDLE );
+        static HANDLE con_err = ::GetStdHandle( STD_ERROR_HANDLE );
+        return console == ConsoleStdOutput ? con_out : con_err;
     }
+#endif
 
-    struct colored_text
+    struct console_color
     {
     public:
-        colored_text( text_color c ) : m_old( get_text_color( ) )
+        console_color( text_color c, console_buffer console = ConsoleStdOutput )
+            : m_old( get( console ) ), m_console( console )
         {
-            set_text_color( c );
+            set( c, m_console );
         }
-        ~colored_text( )
+        ~console_color( )
         {
-            set_text_color( m_old );
+            set( m_old, m_console );
         }
 
     private:
+        text_color get( console_buffer console = ConsoleStdOutput )
+        {
+#ifdef DMK_OS_WIN
+            CONSOLE_SCREEN_BUFFER_INFO info;
+            ::GetConsoleScreenBufferInfo( console_handle( console ), &info );
+            return static_cast<text_color>( info.wAttributes & 0xFF );
+#endif
+        }
+
+        void set( text_color new_color, console_buffer console = ConsoleStdOutput )
+        {
+#ifdef DMK_OS_WIN
+            ::SetConsoleTextAttribute( console_handle( console ), static_cast<WORD>( new_color ) );
+#endif
+        }
         text_color m_old;
+        console_buffer m_console;
     };
 
-    template <text_color color>
-    struct colored_text_tpl
+    template <text_color color, console_buffer console = ConsoleStdOutput>
+    struct colored_text_tpl : public console_color
     {
     public:
-        colored_text_tpl( ) : m_old( get_text_color( ) )
+        colored_text_tpl( ) : console_color( color, console )
         {
-            set_text_color( color );
-        }
-        ~colored_text_tpl( )
-        {
-            set_text_color( m_old );
         }
 
     private:
-        text_color m_old;
     };
+
     typedef colored_text_tpl<DarkBlue> darkblue_text;
     typedef colored_text_tpl<DarkGreen> darkgreen_text;
     typedef colored_text_tpl<DarkCyan> darkcyan_text;
@@ -133,6 +149,24 @@ namespace dmk
     typedef colored_text_tpl<White> white_text;
 
     typedef colored_text_tpl<Gray> debug_text;
+
+    typedef colored_text_tpl<DarkBlue, ConsoleStdError> darkblue_err_text;
+    typedef colored_text_tpl<DarkGreen, ConsoleStdError> darkgreen_err_text;
+    typedef colored_text_tpl<DarkCyan, ConsoleStdError> darkcyan_err_text;
+    typedef colored_text_tpl<DarkRed, ConsoleStdError> darkred_err_text;
+    typedef colored_text_tpl<DarkMagenta, ConsoleStdError> darkmagenta_err_text;
+    typedef colored_text_tpl<DarkYellow, ConsoleStdError> darkyellow_err_text;
+    typedef colored_text_tpl<LightGrey, ConsoleStdError> lightgrey_err_text;
+    typedef colored_text_tpl<Gray, ConsoleStdError> gray_err_text;
+    typedef colored_text_tpl<Blue, ConsoleStdError> blue_err_text;
+    typedef colored_text_tpl<Green, ConsoleStdError> green_err_text;
+    typedef colored_text_tpl<Cyan, ConsoleStdError> cyan_err_text;
+    typedef colored_text_tpl<Red, ConsoleStdError> red_err_text;
+    typedef colored_text_tpl<Magenta, ConsoleStdError> magenta_err_text;
+    typedef colored_text_tpl<Yellow, ConsoleStdError> yellow_err_text;
+    typedef colored_text_tpl<White, ConsoleStdError> white_err_text;
+
+    typedef colored_text_tpl<Gray, ConsoleStdError> debug_err_text;
 
     int fail_exit( )
     {
@@ -202,11 +236,44 @@ namespace dmk
         fmt::print( "\n" );
     }
 
+#ifdef DMK_OS_WIN
+
+    struct handle_finalizer
+    {
+    public:
+        handle_finalizer( HANDLE handle ) : m_handle( handle )
+        {
+        }
+        handle_finalizer( handle_finalizer&& h ) : m_handle( h.m_handle )
+        {
+            h.m_handle = 0;
+        }
+        handle_finalizer& operator=( handle_finalizer&& h )
+        {
+            m_handle   = h.m_handle;
+            h.m_handle = 0;
+        }
+        handle_finalizer( const handle_finalizer& ) = delete;
+        handle_finalizer& operator=( const handle_finalizer& ) = delete;
+        ~handle_finalizer( )
+        {
+            if ( m_handle != 0 && m_handle != INVALID_HANDLE_VALUE )
+                CloseHandle( m_handle );
+        }
+
+    private:
+        HANDLE m_handle;
+    };
+
+    typedef std::vector<handle_finalizer> handle_finalizers;
+
+#endif
+
     struct process
     {
     public:
         explicit process( const path& program, const path& working_dir = current_path( ) )
-            : m_program( program ), m_working_dir( working_dir ), m_exit_code( 0 )
+            : m_program( program ), m_working_dir( working_dir ), m_exit_code( 0 ), m_log_output( false )
         {
         }
         process& operator( )( const std::string& value )
@@ -243,26 +310,62 @@ namespace dmk
         {
             return ( *this )( fmt::format( key, args... ) );
         }
+        void log_output( bool log )
+        {
+            m_log_output = log;
+        }
         void operator( )( bool may_throw = true )
         {
-            create_directories( m_working_dir );
+            handle_finalizers handles;
 
 #ifdef DMK_OS_WIN
-            std::string args_posix = replace_all( m_args, '\\', '/' );
-            {
-                debug_text c;
-                println( m_working_dir.string( ) );
-            }
-            {
-                cyan_text c;
-                println( m_program.filename( ).string( ) + ' ' + args_posix );
-            }
+            m_args = replace_all( m_args, '\\', '/' );
+#endif
+            before( );
+#ifdef DMK_OS_WIN
 
             STARTUPINFOW si;
             PROCESS_INFORMATION pi;
             zeroize( si );
             zeroize( pi );
             si.cb = sizeof( si );
+            if ( m_log_output )
+            {
+                SECURITY_ATTRIBUTES sa;
+                sa.nLength              = sizeof( SECURITY_ATTRIBUTES );
+                sa.lpSecurityDescriptor = NULL;
+                sa.bInheritHandle       = TRUE;
+
+                path stdout_log, stderr_log;
+                log_path( stdout_log, stderr_log );
+
+                si.hStdOutput = CreateFileW( stdout_log.wstring( ).c_str( ),
+                                             GENERIC_WRITE,
+                                             FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                             &sa,
+                                             CREATE_ALWAYS,
+                                             FILE_ATTRIBUTE_NORMAL,
+                                             0 );
+
+                if ( si.hStdOutput == INVALID_HANDLE_VALUE )
+                {
+                    throw error( system_error, "Can't create log file for {} ({})", m_program, stdout_log );
+                }
+                handles.push_back( si.hStdOutput );
+                si.hStdError = CreateFileW( stderr_log.wstring( ).c_str( ),
+                                            GENERIC_WRITE,
+                                            FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                            &sa,
+                                            CREATE_ALWAYS,
+                                            FILE_ATTRIBUTE_NORMAL,
+                                            0 );
+                if ( si.hStdError == INVALID_HANDLE_VALUE )
+                {
+                    throw error( system_error, "Can't create log file for {} ({})", m_program, stderr_log );
+                }
+                handles.push_back( si.hStdError );
+                si.dwFlags = STARTF_USESTDHANDLES;
+            }
 
             std::vector<wchar_t> args;
             args.push_back( '"' );
@@ -270,7 +373,7 @@ namespace dmk
             args.insert( args.end( ), progr.begin( ), progr.end( ) );
             args.push_back( '"' );
             args.push_back( ' ' );
-            args.insert( args.end( ), args_posix.begin( ), args_posix.end( ) );
+            args.insert( args.end( ), m_args.begin( ), m_args.end( ) );
             args.push_back( 0 );
             std::string ext = asci_lowercase( m_program.extension( ).string( ) );
             if ( ext == "bat" || ext == "cmd" )
@@ -302,7 +405,7 @@ namespace dmk
                                   args.data( ),
                                   NULL,
                                   NULL,
-                                  FALSE,
+                                  m_log_output ? TRUE : FALSE,
                                   NORMAL_PRIORITY_CLASS | CREATE_UNICODE_ENVIRONMENT,
                                   env.data( ),
                                   m_working_dir.wstring( ).c_str( ),
@@ -311,26 +414,23 @@ namespace dmk
             {
                 throw error( system_error, "Can't start process {}", m_program.string( ) );
             }
+            handles.push_back( pi.hThread );
+            handles.push_back( pi.hProcess );
             DWORD wait = WaitForSingleObject( pi.hProcess, INFINITE );
             if ( wait != WAIT_OBJECT_0 )
             {
-                CloseHandle( pi.hThread );
-                CloseHandle( pi.hProcess );
                 throw error( system_error, "Can't wait for process {}", m_program.string( ) );
             }
             DWORD ec = 0;
             if ( !GetExitCodeProcess( pi.hProcess, &ec ) )
             {
-                CloseHandle( pi.hThread );
-                CloseHandle( pi.hProcess );
                 throw error( system_error, "Can't get exit code for process {}", m_program.string( ) );
             }
             m_exit_code = ec;
-            CloseHandle( pi.hThread );
-            CloseHandle( pi.hProcess );
 #else
 #error "not implemented"
 #endif
+            after( );
 
             if ( m_exit_code != 0 && may_throw )
             {
@@ -342,26 +442,47 @@ namespace dmk
             return m_exit_code;
         }
 
-    private:
+    protected:
+        virtual void before( )
+        {
+        }
+        virtual void after( )
+        {
+        }
+        virtual void log_path( path& stdout_log, path& stderr_log )
+        {
+            char buff[64];
+
+            std::time_t time = std::time( NULL );
+            std::tm* tm = std::localtime( &time );
+            std::strftime( buff, countof( buff ), "%Y%m%d-%H%M%S", tm );
+
+            stdout_log = unique_path(
+                temp_directory_path( ), ".stdout.log", m_program.filename( ).string( ) + buff + "-%04d" );
+            stderr_log = unique_path(
+                temp_directory_path( ), ".stderr.log", m_program.filename( ).string( ) + buff + "-%04d" );
+        }
         const path m_program;
         const path m_working_dir;
         std::map<std::string, std::string> m_environ;
         std::string m_args;
         int m_exit_code;
+        bool m_log_output;
     };
 
+    template <typename _Process = process>
     void exec( const path& curdir, const path& program, const std::string& args )
     {
-        process p( program, curdir );
+        _Process p( program, curdir );
         p( args );
         p( );
     }
 
-    template <typename... Args>
+    template <typename _Process = process, typename... Args>
     void exec( const path& curdir, const path& program, const std::string& args, const Args&... params )
     {
         std::string args_str = fmt::format( args, params... );
-        exec( curdir, program, args_str );
+        exec<_Process>( curdir, program, args_str );
     }
 
     class fatal_error : public error
@@ -387,7 +508,13 @@ namespace dmk
     public:
         arguments( int argc, char** argv, char** envp )
         {
+#ifdef DMK_OS_WIN
+            wchar_t CurrentExe[MAX_PATH] = { 0 };
+            GetModuleFileNameW( NULL, CurrentExe, countof( CurrentExe ) );
+            m_executable = CurrentExe;
+#else
             m_executable = argv[0];
+#endif
             m_args.reserve( argc );
             for ( size_t i = 1; i < argc; i++ )
             {
@@ -619,7 +746,7 @@ namespace dmk
             {
                 std::string line;
                 {
-                    colored_text c( text_color::Gray );
+                    console_color c( text_color::Gray );
                     fmt::print( get_prompt( ) );
                     fmt::print( ">" );
                 }

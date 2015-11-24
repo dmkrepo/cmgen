@@ -127,6 +127,7 @@ namespace dmk
             vars["configure_root_dir"] = output_root_dir( dir::configure, arch ).string( );
             vars["lib_root_dir"]       = output_root_dir( dir::libraries, arch ).string( );
             vars["bin_root_dir"]       = output_root_dir( dir::binaries, arch ).string( );
+            vars["inc_root_dir"]       = output_root_dir( dir::includes, arch ).string( );
             vars["install_root_dir"]   = output_root_dir( dir::install, arch ).string( );
             return vars;
         }
@@ -138,6 +139,7 @@ namespace dmk
             vars["configure_all_dir"] = output_all_dir( dir::configure, arch ).string( );
             vars["lib_all_dir"]       = output_all_dir( dir::libraries, arch ).string( );
             vars["bin_all_dir"]       = output_all_dir( dir::binaries, arch ).string( );
+            vars["inc_all_dir"]       = output_all_dir( dir::includes, arch ).string( );
             vars["install_all_dir"]   = output_all_dir( dir::install, arch ).string( );
             return vars;
         }
@@ -149,6 +151,7 @@ namespace dmk
             vars["configure_cfg_dir"] = output_cfg_dir( dir::configure, arch, config ).string( );
             vars["lib_cfg_dir"]       = output_cfg_dir( dir::libraries, arch, config ).string( );
             vars["bin_cfg_dir"]       = output_cfg_dir( dir::binaries, arch, config ).string( );
+            vars["inc_cfg_dir"]       = output_cfg_dir( dir::includes, arch, config ).string( );
             vars["install_cfg_dir"]   = output_cfg_dir( dir::install, arch, config ).string( );
             return vars;
         }
@@ -162,6 +165,7 @@ namespace dmk
             vars["configure_dir"] = output_dir( dir::configure, arch, config, name ).string( );
             vars["lib_dir"]       = output_dir( dir::libraries, arch, config, name ).string( );
             vars["bin_dir"]       = output_dir( dir::binaries, arch, config, name ).string( );
+            vars["inc_dir"]       = output_dir( dir::includes, arch, config, name ).string( );
             vars["install_dir"]   = output_dir( dir::install, arch, config, name ).string( );
             return vars;
         }
@@ -202,6 +206,7 @@ namespace dmk
         {
             libraries,
             binaries,
+            includes,
             configure,
             install
         };
@@ -210,8 +215,9 @@ namespace dmk
         {
             static const std::string libraries = "lib";
             static const std::string binaries  = "bin";
+            static const std::string includes  = "inc";
             static const std::string configure = "conf";
-            static const std::string install   = "install";
+            static const std::string install   = "out";
 
             switch ( dir )
             {
@@ -219,6 +225,8 @@ namespace dmk
                 return libraries;
             case project::dir::binaries:
                 return binaries;
+            case project::dir::includes:
+                return includes;
             case project::dir::configure:
                 return configure;
             case project::dir::install:
@@ -270,9 +278,17 @@ namespace dmk
         {
             for ( auto c : env->configs_all )
             {
-                remove_directory( output_dir( dir::libraries, arch, c, name ) );
-                remove_directory( output_dir( dir::binaries, arch, c, name ) );
+                remove_built( name, arch, c );
             }
+        }
+        static void remove_built( const std::string& name,
+                                  const architecture& arch,
+                                  const configuration& config )
+        {
+            remove_directory( output_dir( dir::libraries, arch, config, name ) );
+            remove_directory( output_dir( dir::binaries, arch, config, name ) );
+            remove_directory( output_dir( dir::includes, arch, config, name ) );
+            remove_directory( output_dir( dir::install, arch, config, name ) );
         }
 
         static bool is_imported( const std::string& name )

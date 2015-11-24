@@ -16,6 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
+#include <dmk_time.h>
+#include <set>
 
 #include "expressions.h"
 #include "cmgen.h"
@@ -26,6 +28,7 @@
 namespace dmk
 {
     ptr<const environment> env;
+    bool build_process::quiet = false;
 
     namespace usage
     {
@@ -37,6 +40,7 @@ namespace dmk
         static const std::string up          = "";
         static const std::string cls         = "";
         static const std::string license     = "";
+        static const std::string batch       = "projects\t[ arch\t[ config ] ]";
         static const std::string get         = "[ prop_mask ]";
         static const std::string help        = "";
         static const std::string deps        = "module";
@@ -107,11 +111,13 @@ namespace dmk
             auto deps = project::get_dependencies( name );
             if ( !deps.empty( ) )
             {
-                println( "List of dependencies: {}", join( deps, ", " ) );
+                if ( !build_process::quiet )
+                    println( "List of dependencies: {}", join( deps, ", " ) );
                 push_project( );
                 for ( const std::string& dep : reversed( deps ) )
                 {
-                    println( "Importing dependencies... {}", dep );
+                    if ( !build_process::quiet )
+                        println( "Importing dependencies... {}", dep );
                     do_import( mode != DoForce, dep );
                 }
                 pop_project( );
@@ -134,33 +140,17 @@ namespace dmk
             if ( is_nonempty_directory( module_dir ) )
             {
                 copy_content( module_dir, proj->source_dir( ) );
-                std::vector<path> paths;
-                for ( const directory_entry& e : recursive_directory_iterator( proj->source_dir( ) ) )
-                {
-                    if ( e.path( ).extension( ) == ".__del__" )
-                    {
-                        paths.push_back( e );
-                        path p = e;
-                        p.replace_extension( "" );
-                        paths.push_back( p );
-                    }
-                }
-                for ( const path& p : paths )
-                {
-                    println( "Removing file {}...", p );
-                    remove_if_exists( p );
-                }
             }
-            if ( is_file( proj->source_dir( ) / "apply.patch" ) )
+            for ( auto p : directory_iterator( proj->source_dir( ) ) )
             {
-                if ( !is_file( proj->source_dir( ) / "patch-applied" ) )
+                if ( matches( "apply*.patch", p.path( ).filename( ).string( ) ) )
                 {
-                    println( "Applying patch..." );
-                    exec( proj->source_dir( ),
-                          env->patch_path,
-                          "-u -p0 -i {}",
-                          qo( proj->source_dir( ) / "apply.patch" ) );
-                    touch_file( proj->source_dir( ) / "patch-applied" );
+                    if ( !is_file( p.path( ).string( ) + ".applied" ) )
+                    {
+                        println( "Applying patch..." );
+                        exec<build_process>( proj->source_dir( ), env->patch_path, "-u -p0 -i {}", qo( p ) );
+                        touch_file( p.path( ).string( ) + ".applied" );
+                    }
                 }
             }
         }
@@ -193,7 +183,8 @@ namespace dmk
             }
             create_directories( target_dir );
             path target_file = target_dir / target_name;
-            println( "Copying file {} -> {}", file, target_file );
+            if ( !build_process::quiet )
+                println( "Copying file {} -> {}", file, target_file );
             fix_write_rights( target_file );
             copy( file, target_file, copy_options::overwrite_existing );
         }
@@ -282,7 +273,8 @@ namespace dmk
                 auto deps = project::get_dependencies( project_name );
                 if ( !deps.empty( ) )
                 {
-                    println( "List of dependencies: {}", join( deps, ", " ) );
+                    if ( !build_process::quiet )
+                        println( "List of dependencies: {}", join( deps, ", " ) );
                     push_project( );
                     for ( const std::string& dep : reversed( deps ) )
                     {
@@ -317,6 +309,55 @@ namespace dmk
             {
                 println( "Cancelled" );
             }
+        }
+
+        bool batch_task( const std::string& task, const std::function<void( )>& func )
+        {
+            elapsed_timer t;
+            build_process::quiet = true;
+            try
+            {
+                func( );
+                green_err_text c;
+                fmt::print( stderr, "--- {}: ok ({:4.2f}s)\n", task, t.elapsed( ).as_double( ) );
+            }
+            catch ( const std::exception& e )
+            {
+                red_err_text c;
+                fmt::print( stderr, "--- {}: failed ({:4.2f}s)\n", task, t.elapsed( ).as_double( ) );
+                fmt::print( stderr, "{}\n", e.what( ) );
+                build_process::quiet = false;
+                return false;
+            }
+            build_process::quiet = false;
+            return true;
+        }
+
+        void do_batch( redo_mode mode,
+                       const std::string& name,
+                       const std::string& arch,
+                       const std::string& config )
+        {
+            if ( !batch_task( "import",
+                              [&]( )
+                              {
+                                  import( DoOnce, name );
+                              } ) )
+                return;
+            if ( !batch_task( "configure",
+                              [&]( )
+                              {
+                                  do_select( name );
+                                  configure( mode, arch, config );
+                              } ) )
+                return;
+            if ( !batch_task( "build",
+                              [&]( )
+                              {
+                                  do_select( name );
+                                  build( mode, arch, config );
+                              } ) )
+                return;
         }
 
     public:
@@ -536,6 +577,72 @@ namespace dmk
             return join( result, " " );
         }
 
+        void batch( redo_mode mode,
+                    const std::string& projects,
+                    const std::string& arch,
+                    const std::string& config )
+        {
+            std::vector<std::string> masks = split( projects, ',' );
+            std::vector<std::string> list;
+            for ( const std::string& mask : masks )
+            {
+                for ( const directory_entry& entry : directory_iterator( env->modules_dir ) )
+                {
+                    if ( !is_file( entry ) )
+                        continue;
+                    std::string name = entry.path( ).stem( ).string( );
+                    if ( matches( mask, name ) )
+                    {
+                        list.push_back( name );
+                    }
+                }
+            }
+            std::set<std::string> original_list( list.begin( ), list.end( ) );
+            for ( size_t i = 0; i < list.size( ); )
+            {
+                std::string name              = list[i];
+                std::vector<std::string> deps = project::get_dependencies( name );
+                deps = reversed( deps );
+                list.insert( list.begin( ) + i, deps.begin( ), deps.end( ) );
+                i += 1 + deps.size( );
+            }
+            for ( size_t i = 1; i < list.size( ); )
+            {
+                std::string name = list[i];
+                auto it = list.begin( ) + i;
+                if ( std::find( list.begin( ), it, name ) != it )
+                {
+                    list.erase( it );
+                }
+                else
+                {
+                    i++;
+                }
+            }
+            println( "projects included in the batch: {}", join( list, ", " ) );
+            for ( const std::string& name : list )
+            {
+                push_project( );
+                if ( original_list.find( name ) != original_list.end( ) )
+                {
+                    {
+                        cyan_err_text c;
+                        fmt::print( stderr, "- project: {}\n", name );
+                    }
+                    do_batch( mode, name, arch, config );
+                }
+                else
+                {
+                    {
+                        cyan_err_text c;
+                        fmt::print( stderr, "- project: {} (dep)\n", name );
+                    }
+                    do_batch( DoOnce, name, arch, config );
+                }
+                pop_project( );
+            }
+        }
+
         void modules( const std::string& pattern )
         {
             static const char* yes_no[2] = { ".", "Y" };
@@ -710,16 +817,19 @@ namespace dmk
         cp.bind( "build", u::build, bind( &cmds::build, &cp, DoAlways, _1, _2 ), 0, 2 );
         cp.bind( "reconfigure", u::reconfigure, bind( &cmds::reconfigure, &cp, DoAlways, _1, _2 ), 0, 2 );
         cp.bind( "rebuild", u::rebuild, bind( &cmds::rebuild, &cp, DoAlways, _1, _2 ), 0, 2 );
+        cp.bind( "batch", u::batch, bind( &cmds::batch, &cp, DoAlways, _1, _2, _3 ), 0, 3 );
 
         cp.bind( "import!", u::import, bind( &cmds::import, &cp, DoForce, _1 ), 1, 1 );
         cp.bind( "configure!", u::configure, bind( &cmds::configure, &cp, DoForce, _1, _2 ), 0, 2 );
         cp.bind( "build!", u::build, bind( &cmds::build, &cp, DoForce, _1, _2 ), 0, 2 );
         cp.bind( "reconfigure!", u::reconfigure, bind( &cmds::reconfigure, &cp, DoForce, _1, _2 ), 0, 2 );
         cp.bind( "rebuild!", u::rebuild, bind( &cmds::rebuild, &cp, DoForce, _1, _2 ), 0, 2 );
+        cp.bind( "batch!", u::batch, bind( &cmds::batch, &cp, DoForce, _1, _2, _3 ), 0, 3 );
 
         cp.bind( "import?", u::import, bind( &cmds::import, &cp, DoOnce, _1 ), 1, 1 );
         cp.bind( "configure?", u::configure, bind( &cmds::configure, &cp, DoOnce, _1, _2 ), 0, 2 );
         cp.bind( "build?", u::build, bind( &cmds::build, &cp, DoOnce, _1, _2 ), 0, 2 );
+        cp.bind( "batch?", u::batch, bind( &cmds::batch, &cp, DoOnce, _1, _2, _3 ), 0, 3 );
 
         cp.alias( "project", "select" );
         cp.alias( "update", "fetch" );
@@ -729,6 +839,7 @@ namespace dmk
         cp.alias( "make!", "configure!" );
         cp.alias( "remake!", "reconfigure!" );
         cp.alias( "make?", "configure?" );
+        cp.alias( "test", "batch" );
 
         if ( args.count( ) > 0 )
         {
@@ -744,11 +855,12 @@ namespace dmk
 int main( int argc, char** argv, char** envp )
 {
     using namespace dmk;
+    console_title::set( "CMGen" );
 
     arguments args( argc, argv, envp );
     try
     {
-        println( "CMGen v0.2" );
+        println( "CMGen v0.3" );
         env.reset( new environment( args ) );
         println( "Type help for a list of supported commands" );
     }
