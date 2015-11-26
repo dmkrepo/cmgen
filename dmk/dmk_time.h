@@ -1,17 +1,17 @@
 /**
  * DMK
  * Copyright (C) 2015  Dmitriy Ka
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
@@ -21,31 +21,51 @@
 
 #include "dmk.h"
 #include "dmk_fraction.h"
+#if defined( DMK_OS_WIN )
 #include <windows.h>
+#elif defined( DMK_OS_MAC )
+#include <mach/mach_time.h>
+#endif
 #include <iostream>
 #include <string>
 
 namespace dmk
 {
 
-    inline uint64_t _win_timer_counter( )
+#if defined( DMK_OS_WIN )
+
+    inline uint64_t _os_timer_counter( )
     {
         LARGE_INTEGER freq;
         QueryPerformanceCounter( &freq );
         return freq.QuadPart;
     }
 
-    inline uint64_t _win_timer_frequency( )
+    inline fraction _os_timer_scale( )
     {
         LARGE_INTEGER freq;
         QueryPerformanceFrequency( &freq );
-        return freq.QuadPart;
+        return fraction( 1, freq.QuadPart );
     }
+#elif defined( DMK_OS_MAC )
+    inline uint64_t _os_timer_counter( )
+    {
+        return mach_absolute_time( );
+    }
+
+    inline fraction _os_timer_scale( )
+    {
+        mach_timebase_info_data_t sTimebaseInfo;
+        ( void )mach_timebase_info( &sTimebaseInfo );
+        return fraction( sTimebaseInfo.numer, sTimebaseInfo.denom );
+    }
+
+#endif
 
     inline fraction cpu_time( )
     {
-        static uint64_t freq = _win_timer_frequency( );
-        return fraction( _win_timer_counter( ), freq );
+        static fraction scale = _os_timer_scale( );
+        return scale * _os_timer_counter( );
     }
 
     struct elapsed_timer

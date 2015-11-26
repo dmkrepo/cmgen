@@ -77,7 +77,7 @@ namespace dmk
         ConsoleStdError
     };
 
-#ifdef DMK_OS_WIN
+#if defined( DMK_OS_WIN )
     typedef HANDLE console_handle_t;
 
     inline console_handle_t console_handle( console_buffer console = ConsoleStdOutput )
@@ -316,13 +316,16 @@ namespace dmk
         }
         void operator( )( bool may_throw = true )
         {
-            handle_finalizers handles;
-
-#ifdef DMK_OS_WIN
+#if !defined DMK_OS_POSIX
             m_args = replace_all( m_args, '\\', '/' );
 #endif
             before( );
-#ifdef DMK_OS_WIN
+#if defined DMK_OS_POSIX
+            std::string cmd = m_program.string( ) + " " + m_args;
+            m_exit_code     = 0;
+// m_exit_code     = spawnve( P_WAIT, cmd, argv, envp );
+#elif defined DMK_OS_WIN
+            handle_finalizers handles;
 
             STARTUPINFOW si;
             PROCESS_INFORMATION pi;
@@ -426,7 +429,7 @@ namespace dmk
             {
                 throw error( system_error, "Can't get exit code for process {}", m_program.string( ) );
             }
-            m_exit_code = ec;
+            m_exit_code  = ec;
 #else
 #error "not implemented"
 #endif
@@ -785,6 +788,8 @@ namespace dmk
             char buffer[1024] = { 0 };
             GetConsoleTitleA( buffer, countof( buffer ) );
             return buffer;
+#else
+            return "";
 #endif
         }
         static void set( const std::string& title )

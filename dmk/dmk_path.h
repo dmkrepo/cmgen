@@ -29,11 +29,29 @@
 #include <iostream>
 #include <vector>
 #include <string>
-#include <filesystem>
+#include <system_error>
+#include <chrono>
+#include <iostream>
+#include <ostream>
+#include <istream>
 
+#if defined( DMK_OS_WIN )
+#include <filesystem>
 namespace dmk
 {
     using namespace std::experimental::filesystem;
+}
+#else
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+namespace dmk
+{
+    using namespace boost::filesystem;
+}
+#endif
+
+namespace dmk
+{
 
     class file_error : public error
     {
@@ -98,8 +116,26 @@ namespace dmk
             mode_s[i++] = 'a';
         }
         return _wfopen( file.wstring( ).c_str( ), mode_s );
-#else
-#error not implemented
+#elif defined( DMK_OS_POSIX )
+        char mode_s[8] = { 0 };
+        int i = 0;
+        if ( !!( mode & open_mode::Read ) )
+        {
+            mode_s[i++] = 'r';
+        }
+        if ( !!( mode & open_mode::Write ) )
+        {
+            mode_s[i++] = 'w';
+        }
+        if ( !!( mode & open_mode::Binary ) )
+        {
+            mode_s[i++] = 'b';
+        }
+        if ( !!( mode & open_mode::Append ) )
+        {
+            mode_s[i++] = 'a';
+        }
+        return fopen( file.string( ).c_str( ), mode_s );
 #endif
     }
 
@@ -272,6 +308,8 @@ namespace dmk
             throw error( system_error, "Can't touch file {}", p.string( ) );
         }
         CloseHandle( h );
+#elif defined( DMK_OS_POSIX )
+        touch( p.string( ).c_str( ) );
 #endif
     }
 

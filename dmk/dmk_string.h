@@ -427,6 +427,79 @@ namespace dmk
         return recode<char>( s, s + N - 1 );
     }
 
+    // // // //
+
+    inline const std::wstring& make_wstring( const std::wstring& s )
+    {
+        return s;
+    }
+
+    inline std::wstring&& make_wstring( std::wstring&& s )
+    {
+        return std::move( s );
+    }
+
+    inline std::wstring make_wstring( const wchar_t* s )
+    {
+        return std::wstring( s );
+    }
+
+    template <size_t N>
+    inline std::wstring make_wstring( const wchar_t( &s )[N] )
+    {
+        return std::wstring( s, s + N - 1 );
+    }
+
+    inline std::wstring make_wstring( const std::string& s )
+    {
+        return recode<wchar_t>( s );
+    }
+
+    inline std::wstring make_wstring( const char* s )
+    {
+        return recode<wchar_t>( s );
+    }
+
+    template <size_t N>
+    inline std::wstring make_string( const char( &s )[N] )
+    {
+        return recode<wchar_t>( s, s + N - 1 );
+    }
+
+    inline std::wstring make_wstring( const std::u16string& s )
+    {
+        return recode<wchar_t>( s );
+    }
+
+    inline std::wstring make_wstring( const char16_t* s )
+    {
+        return recode<wchar_t>( s );
+    }
+
+    template <size_t N>
+    inline std::wstring make_wstring( const char16_t( &s )[N] )
+    {
+        return recode<wchar_t>( s, s + N - 1 );
+    }
+
+    inline std::wstring make_wstring( const std::u32string& s )
+    {
+        return recode<wchar_t>( s );
+    }
+
+    inline std::wstring make_wstring( const char32_t* s )
+    {
+        return recode<wchar_t>( s );
+    }
+
+    template <size_t N>
+    inline std::wstring make_wstring( const char32_t( &s )[N] )
+    {
+        return recode<wchar_t>( s, s + N - 1 );
+    }
+
+    // // // //
+
     inline std::string hex( const std::string& str )
     {
         std::string result = "";

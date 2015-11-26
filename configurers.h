@@ -481,17 +481,11 @@ namespace dmk
         friend class builder;
         virtual void do_build( ) override
         {
-            exec<build_process>( m_configure_dir,
-                                 env->scons_path,
-                                 "--{} {}",
-                                 m_arch.bitness,
-                                 join( m_data["options"].flatten( ), " " ) );
+            exec<build_process>(
+                m_configure_dir, env->scons_path, "{}", join( m_data["options"].flatten( ), " " ) );
 
-            exec<build_process>( m_configure_dir,
-                                 env->scons_path,
-                                 "--{} {} install",
-                                 m_arch.bitness,
-                                 join( m_data["options"].flatten( ), " " ) );
+            exec<build_process>(
+                m_configure_dir, env->scons_path, "{} install", join( m_data["options"].flatten( ), " " ) );
         }
     };
 
