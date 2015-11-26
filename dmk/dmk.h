@@ -160,6 +160,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cinttypes>
+#include <cstring>
 
 namespace dmk
 {

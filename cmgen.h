@@ -1,4 +1,4 @@
-﻿/**
+/**
  * CMGen
  * Copyright (C) 2015  Dmitriy Ka
  *
@@ -106,7 +106,7 @@ namespace dmk
             else
             {
                 fix_write_rights( target );
-                copy( source, target, copy_options::overwrite_existing );
+                copy_file( source, target, DMK_COPY_OVERWRITE );
             }
         }
         catch ( const error& e )
@@ -380,18 +380,21 @@ namespace dmk
 #if defined DMK_OS_WIN
 #define DMK_EXEC_EXT ".exe"
 #define DMK_COMM_EXT ".cmd"
+#else
+#define DMK_EXEC_EXT ""
+#define DMK_COMM_EXT ".sh"
 #endif
 
     namespace dir
     {
-        constexpr char* source   = "source";
-        constexpr char* projects = "projects";
-        constexpr char* licenses = "licenses";
-        constexpr char* modules  = "modules";
-        constexpr char* flags    = "flags";
+        constexpr const char* source   = "source";
+        constexpr const char* projects = "projects";
+        constexpr const char* licenses = "licenses";
+        constexpr const char* modules  = "modules";
+        constexpr const char* flags    = "flags";
     }
 
-    constexpr char* var_true = "1";
+    constexpr const char* var_true = "1";
 
     typedef json_format<> options_format;
 

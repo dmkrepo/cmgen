@@ -1,4 +1,4 @@
-﻿/**
+/**
  * DMK
  * Copyright (C) 2015  Dmitriy Ka
  *
@@ -216,7 +216,7 @@ namespace dmk
     public:
         typedef std::vector<json> array;
         typedef ordered_map<json> object;
-        typedef std::pair<const std::string, json> objectpair;
+        typedef std::pair<std::string, json> objectpair;
         static json readonly_array_item;
         static json readonly_object_item;
         void check_readonly( ) const
@@ -244,7 +244,7 @@ namespace dmk
         {
             assign_null( );
         }
-        json( nullptr_t )
+        json( std::nullptr_t )
         {
             assign_null( );
         }
@@ -389,7 +389,7 @@ namespace dmk
         {
             return assign( value ), *this;
         }
-        json& operator=( nullptr_t )
+        json& operator=( std::nullptr_t )
         {
             return assign_null( ), *this;
         }
@@ -507,6 +507,7 @@ namespace dmk
         json& operator=( const std::vector<std::string>& value )
         {
             assign( value );
+            return *this;
         }
 
         template <typename _TargetType>
@@ -590,7 +591,7 @@ namespace dmk
         }
         const object& as_object( ) const
         {
-            static const object empty;
+            static const object empty = object();
             return is_object( ) ? *m_obj : empty;
         }
         bool has_index( size_t index ) const

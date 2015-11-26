@@ -12,6 +12,20 @@ add_definitions(
 	-D_CRT_SECURE_NO_WARNINGS
 )
 
+if(NOT MSVC)
+
+find_package(boost REQUIRED COMPONENTS filesystem )
+
+include_directories( ${Boost_INCLUDE_DIRS} )
+link_directories(/usr/local/lib)
+
+add_definitions(
+	-std=c++14
+	-Wno-switch
+	-Wno-logical-op-parentheses
+)
+endif()
+
 include_directories(dmk)
 
 add_executable(cmgen 
@@ -36,3 +50,9 @@ add_executable(cmgen
 	dmk/cppformat/format.cc
 	dmk/cppformat/format.h
 )
+
+if(NOT MSVC)
+
+target_link_libraries(cmgen boost_system-mt boost_filesystem-mt)
+
+endif()

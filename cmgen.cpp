@@ -186,7 +186,7 @@ namespace dmk
             if ( !build_process::quiet )
                 println( "Copying file {} -> {}", file, target_file );
             fix_write_rights( target_file );
-            copy( file, target_file, copy_options::overwrite_existing );
+            copy_file( file, target_file, DMK_COPY_OVERWRITE );
         }
 
         void do_license( )

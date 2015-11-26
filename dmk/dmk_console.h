@@ -108,6 +108,8 @@ namespace dmk
             CONSOLE_SCREEN_BUFFER_INFO info;
             ::GetConsoleScreenBufferInfo( console_handle( console ), &info );
             return static_cast<text_color>( info.wAttributes & 0xFF );
+#else
+            return Normal;
 #endif
         }
 
@@ -797,7 +799,6 @@ namespace dmk
 #if defined DMK_OS_WIN
             SetConsoleTitleA( title.c_str( ) );
 #else
-#error "not implemented"
 #endif
         }
         explicit console_title( const std::string& message ) : m_saved( get( ) )

@@ -40,6 +40,7 @@
 namespace dmk
 {
     using namespace std::experimental::filesystem;
+#define DMK_COPY_OVERWRITE std::experimental::filesystem::copy_options::overwrite_existing
 }
 #else
 #include <boost/filesystem/operations.hpp>
@@ -47,6 +48,8 @@ namespace dmk
 namespace dmk
 {
     using namespace boost::filesystem;
+    using copy_options = copy_option;
+#define DMK_COPY_OVERWRITE boost::filesystem::copy_option::overwrite_if_exists
 }
 #endif
 
@@ -70,6 +73,7 @@ namespace dmk
 
     void fix_write_rights( const path& entry )
     {
+#if defined( DMK_OS_WIN )
         std::wstring pathw = entry.wstring( );
         DWORD attr = GetFileAttributesW( pathw.c_str( ) );
         if ( attr & FILE_ATTRIBUTE_READONLY )
@@ -77,6 +81,7 @@ namespace dmk
             attr &= ~( DWORD )FILE_ATTRIBUTE_READONLY;
             SetFileAttributesW( pathw.c_str( ), attr );
         }
+#endif
     }
 
     inline open_mode operator|( open_mode x, open_mode y )
@@ -309,7 +314,7 @@ namespace dmk
         }
         CloseHandle( h );
 #elif defined( DMK_OS_POSIX )
-        touch( p.string( ).c_str( ) );
+        //touch( p.string( ).c_str( ) );
 #endif
     }
 

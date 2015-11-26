@@ -149,8 +149,9 @@ namespace dmk
             {
             case SingleConfig:
                 return m_configs;
-            case MultiConfig:
-            case MultiBuild:
+            /*case MultiConfig:
+            case MultiBuild:*/
+            default:
                 return m_multi_config;
             }
         }
@@ -160,11 +161,12 @@ namespace dmk
         {
             switch ( get_kind( ) )
             {
-            case SingleConfig:
-            case MultiConfig:
-                return m_configs;
             case MultiBuild:
                 return m_multi_config;
+            /*case SingleConfig:
+            case MultiConfig:*/
+            default:
+                return m_configs;
             }
         }
 

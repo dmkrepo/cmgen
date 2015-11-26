@@ -58,7 +58,7 @@ namespace dmk
         std::string msg( pMsgBuf, pMsgBuf + nMsgLen );
         LocalFree( pMsgBuf );
         return fmt::format( "{}; GetLastError={}", msg, ErrorCode );
-#elif defines( DMK_OS_POSIX )
+#elif defined( DMK_OS_POSIX )
         return "unknown posix error";
 #endif
     }
