@@ -31,7 +31,7 @@ cd /d %BUILDBIN%\tools
 )
 
 @echo Downloading MSYS...
-cscript httpget.js http://downloads.sourceforge.net/project/msys2/Base/x86_64/msys2-x86_64-20150916.exe msys2.exe
+cscript %BUILDBIN%\httpget.js http://downloads.sourceforge.net/project/msys2/Base/x86_64/msys2-x86_64-20150916.exe msys2.exe
 ::if NOT '%ERRORLEVEL%'=='0' goto ERROR
 @echo Installing MSYS...
 set TARGET_DIR=%BUILDBIN%\tools\msys
@@ -152,9 +152,13 @@ del /Q %BUILDBIN%\tools\git.exe
 if NOT '%ERRORLEVEL%'=='0' goto ERROR
 @echo Installing Python...
 mkdir %BUILDBIN%\tools\python
-msiexec /qb /L*v python-log.txt /i python.msi ADDLOCAL="core,pywin32" INSTALLDIR=%BUILDBIN%\tools\python
+::Full install: msiexec /qb /L*v python-log.txt /i python.msi ADDLOCAL="core,pywin32" INSTALLDIR=%BUILDBIN%\tools\python
+msiexec /a python.msi /qb TARGETDIR=%BUILDBIN%\tools\pytmp
 if NOT '%ERRORLEVEL%'=='0' goto ERROR
+mkdir python
+xcopy %BUILDBIN%\tools\pytmp\WINVOL\Python27\* %BUILDBIN%\tools\python /s /i
 del /Q %BUILDBIN%\tools\python.msi
+rmdir /S /Q %BUILDBIN%\tools\pytmp
 :SKIP_PYTHON
 
 :: SCONS
