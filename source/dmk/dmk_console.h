@@ -24,6 +24,8 @@
 #include "dmk_result.h"
 #if defined( DMK_OS_WIN )
 #include <windows.h>
+#elif defined( DMK_OS_MAC )
+#include <mach-o/dyld.h>
 #endif
 #include <iostream>
 #include <cstdlib>
@@ -431,7 +433,7 @@ namespace dmk
             {
                 throw error( system_error, "Can't get exit code for process {}", m_program.string( ) );
             }
-            m_exit_code  = ec;
+            m_exit_code = ec;
 #else
 #error "not implemented"
 #endif
@@ -513,9 +515,26 @@ namespace dmk
     public:
         arguments( int argc, char** argv, char** envp )
         {
-#ifdef DMK_OS_WIN
+#if defined DMK_OS_WIN
             wchar_t CurrentExe[MAX_PATH] = { 0 };
             GetModuleFileNameW( NULL, CurrentExe, countof( CurrentExe ) );
+            m_executable = CurrentExe;
+#elif defined DMK_OS_MAC
+            char CurrentExe[PATH_MAX];
+            uint32_t len = sizeof( CurrentExe );
+            if ( _NSGetExecutablePath( CurrentExe, &len ) != 0 )
+            {
+                CurrentExe[0] = '\0';
+            }
+            else
+            {
+                char* canonicalPath = realpath( CurrentExe, NULL );
+                if ( canonicalPath != NULL )
+                {
+                    strncpy( CurrentExe, canonicalPath, len );
+                    free( canonicalPath );
+                }
+            }
             m_executable = CurrentExe;
 #else
             m_executable = argv[0];

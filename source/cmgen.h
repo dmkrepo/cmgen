@@ -405,6 +405,7 @@ namespace dmk
         std::string platform_name; // Visual Studio 2015
         std::string platform_version; // msvc2015
         std::string platform_alt_version; // msvc14
+        path dev_dir;
         path tools_dir;
         path root_dir;
         path source_root_dir;
@@ -444,7 +445,8 @@ namespace dmk
     public:
         environment( arguments& args )
         {
-            tools_dir = args.executable( ).parent_path( ).parent_path( );
+            dev_dir = args.executable( ).parent_path( ).parent_path( );
+            tools_dir = dev_dir / "tools";
 #if defined( DMK_OS_WIN )
             variables["win"] = var_true;
 #endif
@@ -481,7 +483,13 @@ namespace dmk
                 throw fatal_error( "Invalid root directory" );
             }
 
-            std::string platform = args.extract( "--platform", "CMGEN_PLATFORM", "msvc2015" );
+#if defined DMK_OS_WIN
+            static const std::string default_platform = "msvc2015";
+#elif defined DMK_OS_MAC
+            static const std::string default_platform = "xcode";
+#endif
+
+            std::string platform = args.extract( "--platform", "CMGEN_PLATFORM", default_platform );
 
             initialize_dirs( root );
             initialize_platform( platform );
@@ -499,12 +507,14 @@ namespace dmk
             create_directories( licenses_dir );
             create_directories( flags_dir );
             variables["root_dir"]        = root_dir.string( );
+            variables["dev_dir"]         = dev_dir.string( );
             variables["tools_dir"]       = tools_dir.string( );
             variables["modules_dir"]     = modules_dir.string( );
             variables["licenses_dir"]    = licenses_dir.string( );
             variables["source_root_dir"] = source_root_dir.string( );
             variables["flags_dir"]       = flags_dir.string( );
 
+            println( "Dev dir: {}", dev_dir );
             println( "Root dir: {}", root_dir );
             println( "Tools dir: {}", tools_dir );
             println( "Source dir: {}", source_root_dir );
@@ -626,7 +636,7 @@ namespace dmk
         {
             if ( !is_directory( dir ) )
             {
-                throw fatal_error( "Can't find {}. Run {}", qo( dir ), tools_dir / "install" DMK_COMM_EXT );
+                throw fatal_error( "Can't find {}. Run {}", qo( dir ), dev_dir / "install" DMK_COMM_EXT );
             }
             variables[name + "_dir"] = dir.string( );
             return dir;
@@ -635,7 +645,7 @@ namespace dmk
         {
             if ( !is_file( tool ) )
             {
-                throw fatal_error( "Can't find {}. Run {}", qo( tool ), tools_dir / "install" DMK_COMM_EXT );
+                throw fatal_error( "Can't find {}. Run {}", qo( tool ), dev_dir / "install" DMK_COMM_EXT );
             }
             variables[name + "_path"] = tool.string( );
             variables[name + "_dir"]  = tool.parent_path( ).string( );
@@ -643,30 +653,49 @@ namespace dmk
         }
         void load_paths( )
         {
-            temp_dir      = add_dir( env["%TEMP%"], "temp" );
+            ext_dir = add_dir( dev_dir / "ext", "ext" );
+
+#if defined DMK_OS_WIN
+            temp_dir      = add_dir( env["%TMP%"], "temp" );
             msys_dir      = add_dir( tools_dir / "msys", "msys" );
             msys_bin_dir  = add_dir( msys_dir / "usr" / "bin", "msys_bin" );
-            ext_dir       = add_dir( tools_dir / "ext", "ext" );
             git_path      = add_tool( tools_dir / "PortableGit" / "bin" / "git" DMK_EXEC_EXT, "git" );
             hg_path       = add_tool( tools_dir / "hg" / "hg" DMK_EXEC_EXT, "hg" );
             cmake_path    = add_tool( tools_dir / "cmake" / "bin" / "cmake" DMK_EXEC_EXT, "cmake" );
+            ruby_path     = add_tool( tools_dir / "ruby" / "bin" / "ruby" DMK_EXEC_EXT, "ruby" );
             python_path   = add_tool( tools_dir / "python" / "python" DMK_EXEC_EXT, "python" );
             scons_path    = add_tool( tools_dir / "python" / "scons.bat", "scons" );
             perl_path     = add_tool( tools_dir / "perl" / "perl" / "bin" / "perl" DMK_EXEC_EXT, "perl" );
-            jom_path      = add_tool( tools_dir / "jom" / "jom" DMK_EXEC_EXT, "jom" );
-            ruby_path     = add_tool( tools_dir / "ruby" / "bin" / "ruby" DMK_EXEC_EXT, "ruby" );
             sevenzip_path = add_tool( tools_dir / "7zip" / "7za" DMK_EXEC_EXT, "sevenzip" );
-            configure_qmake_path =
-                add_tool( tools_dir / "ext" / "configure_qmake" DMK_COMM_EXT, "configure_qmake" );
-            build_qmake_path = add_tool( tools_dir / "ext" / "build_qmake" DMK_COMM_EXT, "build_qmake" );
-
-            tar_path   = add_tool( msys_bin_dir / "bsdtar" DMK_EXEC_EXT, "tar" );
-            unzip_path = add_tool( msys_bin_dir / "unzip" DMK_EXEC_EXT, "unzip" );
-            curl_path  = add_tool( msys_bin_dir / "curl" DMK_EXEC_EXT, "curl" );
-            wget_path  = add_tool( msys_bin_dir / "wget" DMK_EXEC_EXT, "wget" );
-            patch_path = add_tool( msys_bin_dir / "patch" DMK_EXEC_EXT, "patch" );
-            make_path  = add_tool( msys_bin_dir / "make" DMK_EXEC_EXT, "make" );
-            nasm_path  = add_tool( msys_bin_dir / "nasm" DMK_EXEC_EXT, "nasm" );
+            jom_path      = add_tool( tools_dir / "jom" / "jom" DMK_EXEC_EXT, "jom" );
+            tar_path      = add_tool( msys_bin_dir / "bsdtar" DMK_EXEC_EXT, "tar" );
+            unzip_path    = add_tool( msys_bin_dir / "unzip" DMK_EXEC_EXT, "unzip" );
+            curl_path     = add_tool( msys_bin_dir / "curl" DMK_EXEC_EXT, "curl" );
+            wget_path     = add_tool( msys_bin_dir / "wget" DMK_EXEC_EXT, "wget" );
+            patch_path    = add_tool( msys_bin_dir / "patch" DMK_EXEC_EXT, "patch" );
+            make_path     = add_tool( msys_bin_dir / "make" DMK_EXEC_EXT, "make" );
+            nasm_path     = add_tool( msys_bin_dir / "nasm" DMK_EXEC_EXT, "nasm" );
+#else
+            temp_dir                                  = add_dir( "/tmp", "temp" );
+            git_path                                  = add_tool( "git", "git" );
+            hg_path                                   = add_tool( "hg", "hg" );
+            cmake_path                                = add_tool( "cmake", "cmake" );
+            ruby_path                                 = add_tool( "ruby", "ruby" );
+            python_path                               = add_tool( "python", "python" );
+            scons_path                                = add_tool( "scons", "scons" );
+            perl_path                                 = add_tool( "perl", "perl" );
+            sevenzip_path                             = add_tool( "7za", "sevenzip" );
+            tar_path                                  = add_tool( "bsdtar", "tar" );
+            unzip_path                                = add_tool( "unzip", "unzip" );
+            curl_path                                 = add_tool( "curl", "curl" );
+            wget_path                                 = add_tool( "wget", "wget" );
+            patch_path                                = add_tool( "patch", "patch" );
+            make_path                                 = add_tool( "make", "make" );
+            nasm_path                                 = add_tool( "nasm", "nasm" );
+            jom_path                                  = add_tool( "make", "jom" );
+#endif
+            configure_qmake_path = add_tool( ext_dir / "configure_qmake" DMK_COMM_EXT, "configure_qmake" );
+            build_qmake_path     = add_tool( ext_dir / "build_qmake" DMK_COMM_EXT, "build_qmake" );
         }
 
         void load_config( )
