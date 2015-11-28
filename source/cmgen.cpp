@@ -1,4 +1,4 @@
-﻿/**
+/**
  * CMGen
  * Copyright (C) 2015  Dmitriy Ka
  *

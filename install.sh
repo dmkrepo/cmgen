@@ -13,7 +13,7 @@ which -s wget  || brew install wget
 
 BUILDBIN="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-if [ -f $BUILDBIN/tools/cmake/bin/cmake ]; then
+if [ -f $BUILDBIN/tools/cmake/CMake.app/Contents/bin/cmake ]; then
 	echo CMake is already installed, skipping
 else
 	echo Downloading CMake...
@@ -23,7 +23,17 @@ else
 	mkdir $BUILDBIN/tools/cmake
 	bsdtar -xf $BUILDBIN/tools/cmake.tar.gz --strip=1 -C $BUILDBIN/tools/cmake
 	rm $BUILDBIN/tools/cmake.tar.gz
-	rm $BUILDBIN/tools/cmake/share/cmake-3.3/Modules/FindZLIB.cmake
-	rm $BUILDBIN/tools/cmake/share/cmake-3.3/Modules/FindFreetype.cmake
-	rm $BUILDBIN/tools/cmake/share/cmake-3.3/Modules/FindThreads.cmake
+	rm $BUILDBIN/tools/cmake/CMake.app/Contents/share/cmake-3.3/Modules/FindZLIB.cmake
+	rm $BUILDBIN/tools/cmake/CMake.app/Contents/share/cmake-3.3/Modules/FindFreetype.cmake
+fi
+
+if [ -f $BUILDBIN/cmgen/cmgen ]; then
+    echo CMGen is already installed, skipping
+else
+    echo Building CMGen...
+    rm -rf $BUILDBIN/cmgen-build
+    mkdir $BUILDBIN/cmgen-build
+    cd $BUILDBIN/cmgen-build
+    $BUILDBIN/tools/cmake/CMake.app/Contents/bin/cmake -G Xcode $BUILDBIN/source
+    $BUILDBIN/tools/cmake/CMake.app/Contents/bin/cmake --build . --config Release
 fi

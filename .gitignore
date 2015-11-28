@@ -29,5 +29,6 @@
 
 # Installed tools
 tools*
+cmgen/*
 cmgen-build*
 cmgen-debug*

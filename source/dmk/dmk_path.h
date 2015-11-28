@@ -71,7 +71,7 @@ namespace dmk
         Append = 8
     };
 
-    void fix_write_rights( const path& entry )
+    inline void fix_write_rights( const path& entry )
     {
 #if defined( DMK_OS_WIN )
         std::wstring pathw = entry.wstring( );
@@ -99,7 +99,7 @@ namespace dmk
         return !static_cast<bool>( x );
     }
 
-    FILE* open_file( const path& file, open_mode mode )
+    inline FILE* open_file( const path& file, open_mode mode )
     {
 #if defined( DMK_OS_WIN )
         wchar_t mode_s[8] = { 0 };
@@ -154,9 +154,22 @@ namespace dmk
         return qo( str.string( ) );
     }
 
-    bool is_file( const path& p )
+    inline bool is_file( const path& p )
     {
         return is_regular_file( p ) || ( is_symlink( p ) && is_regular_file( read_symlink( p ) ) );
+    }
+
+    inline path find_in_path( const path& bin )
+    {
+        std::vector<std::string> dirs = split( std::getenv( "PATH" ), DMK_IF_WIN( ';', ':' ) );
+        for ( auto dir : dirs )
+        {
+            if ( is_file( path( dir ) / bin ) )
+            {
+                return path( dir ) / bin;
+            }
+        }
+        throw error( "Can't find {} in PATH", bin.string( ) );
     }
 
     template <typename _Type>
@@ -314,7 +327,12 @@ namespace dmk
         }
         CloseHandle( h );
 #elif defined( DMK_OS_POSIX )
-        //touch( p.string( ).c_str( ) );
+        FILE* fp = fopen( p.string( ).c_str( ), "w" );
+        if ( !fp )
+        {
+            throw error( system_error, "Can't touch file {}", p.string( ) );
+        }
+        fclose( fp );
 #endif
     }
 

@@ -14,7 +14,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+ * USA.
  */
 
 #pragma once
@@ -22,16 +23,28 @@
 #include "dmk.h"
 #include "dmk_path.h"
 #include "dmk_result.h"
+#include <stdio.h>
 #if defined( DMK_OS_WIN )
 #include <windows.h>
+#include <process.h>
 #elif defined( DMK_OS_MAC )
 #include <mach-o/dyld.h>
+#endif
+#if defined DMK_OS_POSIX
+#include <unistd.h>
+#include <spawn.h>
+#include <sys/wait.h>
+#include <wordexp.h>
 #endif
 #include <iostream>
 #include <cstdlib>
 #include <map>
 #include <functional>
 #include <exception>
+
+#if defined DMK_OS_POSIX
+extern char** environ;
+#endif
 
 namespace dmk
 {
@@ -318,6 +331,54 @@ namespace dmk
         {
             m_log_output = log;
         }
+
+#if defined DMK_OS_POSIX
+        void split_free( char** argv )
+        {
+            if ( argv )
+            {
+                for ( int i = 0; argv[i]; i++ )
+                {
+                    free( argv[i] );
+                }
+                free( argv );
+            }
+        }
+        char** split_commandline( const char* exec, const char* cmdline, int* argc )
+        {
+            int i;
+            char** argv = NULL;
+            assert( argc );
+            if ( !cmdline )
+            {
+                return NULL;
+            }
+            wordexp_t p;
+            if ( wordexp( cmdline, &p, 0 ) )
+            {
+                return NULL;
+            }
+            *argc = p.we_wordc;
+            if ( !( argv = ( char** )calloc( *argc + 2, sizeof( char* ) ) ) )
+            {
+                goto fail;
+            }
+            argv[0] = strdup( exec );
+            for ( i = 0; i < p.we_wordc; i++ )
+            {
+                if ( !( argv[i + 1] = strdup( p.we_wordv[i] ) ) )
+                {
+                    goto fail;
+                }
+            }
+            wordfree( &p );
+            return argv;
+        fail:
+            wordfree( &p );
+            split_free( argv );
+            return NULL;
+        }
+#endif
         void operator( )( bool may_throw = true )
         {
 #if !defined DMK_OS_POSIX
@@ -325,9 +386,24 @@ namespace dmk
 #endif
             before( );
 #if defined DMK_OS_POSIX
-            std::string cmd = m_program.string( ) + " " + m_args;
-            m_exit_code     = 0;
-// m_exit_code     = spawnve( P_WAIT, cmd, argv, envp );
+            pid_t pid;
+            std::string cmd  = m_program.string( ) + " " + m_args;
+            std::string prog = m_program.filename( ).string( );
+
+            path saved = current_path( );
+            current_path( m_working_dir );
+
+            int argc    = 0;
+            char** argv = split_commandline( prog.c_str( ), m_args.c_str( ), &argc );
+            char** envp = environ;
+
+            m_exit_code = posix_spawn( &pid, m_program.string( ).c_str( ), NULL, NULL, argv, envp );
+            if ( m_exit_code == 0 )
+            {
+                waitpid( pid, &m_exit_code, 0 );
+            }
+            split_free( argv );
+            current_path( saved );
 #elif defined DMK_OS_WIN
             handle_finalizers handles;
 
@@ -674,7 +750,8 @@ namespace dmk
             }
             else
             {
-                throw command_error( "Unrecognized command: {}. Type help for a list of supported commands",
+                throw command_error( "Unrecognized command: {}. Type help for a list of "
+                                     "supported commands",
                                      tokens[0] );
             }
         }

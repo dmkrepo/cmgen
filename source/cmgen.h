@@ -217,6 +217,10 @@ namespace dmk
     inline void remove_content( const path& directory, bool print = !build_process::quiet )
     {
         yellow_text c;
+        if ( !is_directory( directory ) )
+        {
+            return;
+        }
         for ( const directory_entry& entry : directory_iterator( directory ) )
         {
             if ( print )
@@ -445,7 +449,7 @@ namespace dmk
     public:
         environment( arguments& args )
         {
-            dev_dir = args.executable( ).parent_path( ).parent_path( );
+            dev_dir   = args.executable( ).parent_path( ).parent_path( );
             tools_dir = dev_dir / "tools";
 #if defined( DMK_OS_WIN )
             variables["win"] = var_true;
@@ -570,6 +574,19 @@ namespace dmk
                 variables["msvcyear"] = year;
                 variables["msvc_dir"] = bin_dir.string( );
             }
+            else if ( id == "xcode" )
+            {
+                platform = "xcode";
+                std::string ver;
+                std::string year;
+                year                   = "2015";
+                ver                    = "7";
+                platform_name          = "XCode " + ver;
+                platform_version       = platform + ver;
+                platform_alt_version   = platform + year;
+                variables["xcodever"]  = ver;
+                variables["xcodeyear"] = year;
+            }
             else
             {
                 throw fatal_error( "Unknown platform id: {}", id );
@@ -643,13 +660,17 @@ namespace dmk
         }
         path add_tool( const path& tool, const std::string& name )
         {
-            if ( !is_file( tool ) )
+            path tool_file = tool;
+            if ( !tool_file.is_absolute( ) )
+                tool_file = find_in_path( tool_file );
+            if ( !is_file( tool_file ) )
             {
-                throw fatal_error( "Can't find {}. Run {}", qo( tool ), dev_dir / "install" DMK_COMM_EXT );
+                throw fatal_error(
+                    "Can't find {}. Run {}", qo( tool_file ), dev_dir / "install" DMK_COMM_EXT );
             }
-            variables[name + "_path"] = tool.string( );
-            variables[name + "_dir"]  = tool.parent_path( ).string( );
-            return tool;
+            variables[name + "_path"] = tool_file.string( );
+            variables[name + "_dir"]  = tool_file.parent_path( ).string( );
+            return tool_file;
         }
         void load_paths( )
         {
@@ -679,7 +700,11 @@ namespace dmk
             temp_dir                                  = add_dir( "/tmp", "temp" );
             git_path                                  = add_tool( "git", "git" );
             hg_path                                   = add_tool( "hg", "hg" );
-            cmake_path                                = add_tool( "cmake", "cmake" );
+#if defined DMK_OS_MAC
+            cmake_path                                = add_tool( tools_dir / "cmake/CMake.app/Contents/bin/cmake", "cmake" );
+#else
+            cmake_path = add_tool( "cmake", "cmake" );
+#endif
             ruby_path                                 = add_tool( "ruby", "ruby" );
             python_path                               = add_tool( "python", "python" );
             scons_path                                = add_tool( "scons", "scons" );

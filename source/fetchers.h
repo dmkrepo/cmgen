@@ -74,6 +74,10 @@ namespace dmk
             }
             else
             {
+                if ( is_file( m_destination / ".DS_Store" ) )
+                {
+                    remove( m_destination / ".DS_Store" );
+                }
                 std::string url    = m_package["url"] || "";
                 std::string branch = m_package["branch"] || "master";
                 exec<build_process>( m_destination.parent_path( ),
