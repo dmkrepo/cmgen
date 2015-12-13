@@ -17,14 +17,14 @@ if [ -f $BUILDBIN/tools/cmake/CMake.app/Contents/bin/cmake ]; then
 	echo CMake is already installed, skipping
 else
 	echo Downloading CMake...
-	curl -o $BUILDBIN/tools/cmake.tar.gz -L https://cmake.org/files/v3.3/cmake-3.3.2-Darwin-x86_64.tar.gz
+	curl -o $BUILDBIN/tools/cmake.tar.gz -L https://cmake.org/files/v3.4/cmake-3.4.1-Darwin-x86_64.tar.gz
 
 	echo Unpacking CMake...
 	mkdir $BUILDBIN/tools/cmake
 	bsdtar -xf $BUILDBIN/tools/cmake.tar.gz --strip=1 -C $BUILDBIN/tools/cmake
 	rm $BUILDBIN/tools/cmake.tar.gz
-	rm $BUILDBIN/tools/cmake/CMake.app/Contents/share/cmake-3.3/Modules/FindZLIB.cmake
-	rm $BUILDBIN/tools/cmake/CMake.app/Contents/share/cmake-3.3/Modules/FindFreetype.cmake
+	#rm $BUILDBIN/tools/cmake/CMake.app/Contents/share/cmake-3.3/Modules/FindZLIB.cmake
+	#rm $BUILDBIN/tools/cmake/CMake.app/Contents/share/cmake-3.3/Modules/FindFreetype.cmake
 fi
 
 if [ -f $BUILDBIN/cmgen/cmgen ]; then

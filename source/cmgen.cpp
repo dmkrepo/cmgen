@@ -294,6 +294,8 @@ namespace dmk
                 throw error( "Module {} doesn't exist", name );
             if ( !project::is_imported( name ) )
                 throw error( "Module {} isn't imported", name );
+            if ( project::is_local( name ) )
+                throw error( "Project {} is local", name );
             fmt::print( "Removing {}... type y to confirm : ", name );
             std::string y;
             std::getline( std::cin, y );
@@ -404,7 +406,6 @@ namespace dmk
             }
             catch ( const std::exception& e )
             {
-                project::clear_imported( name );
                 throw command_error( e, "Couldn't remove project {}", name );
             }
         }

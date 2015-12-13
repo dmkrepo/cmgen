@@ -70,12 +70,8 @@ namespace dmk
             std::tm* tm = std::localtime( &time );
             std::strftime( buff, countof( buff ), "%Y%m%d-%H%M%S", tm );
 
-            stdout_log = unique_path( temp_directory_path( ),
-                                      ".stdout.log",
-                                      title + "_" + m_program.filename( ).string( ) + buff + "-%04d" );
-            stderr_log = unique_path( temp_directory_path( ),
-                                      ".stderr.log",
-                                      title + "_" + m_program.filename( ).string( ) + buff + "-%04d" );
+            stdout_log = unique_path( temp_directory_path( ), ".stdout.log", title + "_" + buff + "-%04d" );
+            stderr_log = unique_path( temp_directory_path( ), ".stderr.log", title + "_" + buff + "-%04d" );
         }
     };
 
@@ -434,7 +430,9 @@ namespace dmk
         path nasm_path;
         path patch_path;
         path perl_path;
+        path bash_path;
         path jom_path;
+        path ninja_path;
         path ruby_path;
         path configure_qmake_path;
         path build_qmake_path;
@@ -689,6 +687,7 @@ namespace dmk
             perl_path     = add_tool( tools_dir / "perl" / "perl" / "bin" / "perl" DMK_EXEC_EXT, "perl" );
             sevenzip_path = add_tool( tools_dir / "7zip" / "7za" DMK_EXEC_EXT, "sevenzip" );
             jom_path      = add_tool( tools_dir / "jom" / "jom" DMK_EXEC_EXT, "jom" );
+            ninja_path    = add_tool( tools_dir / "ninja" / "ninja" DMK_EXEC_EXT, "ninja" );
             tar_path      = add_tool( msys_bin_dir / "bsdtar" DMK_EXEC_EXT, "tar" );
             unzip_path    = add_tool( msys_bin_dir / "unzip" DMK_EXEC_EXT, "unzip" );
             curl_path     = add_tool( msys_bin_dir / "curl" DMK_EXEC_EXT, "curl" );
@@ -696,6 +695,7 @@ namespace dmk
             patch_path    = add_tool( msys_bin_dir / "patch" DMK_EXEC_EXT, "patch" );
             make_path     = add_tool( msys_bin_dir / "make" DMK_EXEC_EXT, "make" );
             nasm_path     = add_tool( msys_bin_dir / "nasm" DMK_EXEC_EXT, "nasm" );
+            bash_path     = add_tool( msys_bin_dir / "bash" DMK_EXEC_EXT, "bash" );
 #else
             temp_dir                                  = add_dir( "/tmp", "temp" );
             git_path                                  = add_tool( "git", "git" );
@@ -718,6 +718,8 @@ namespace dmk
             make_path                                 = add_tool( "make", "make" );
             nasm_path                                 = add_tool( "nasm", "nasm" );
             jom_path                                  = add_tool( "make", "jom" );
+            ninja_path                                = add_tool( "ninja", "ninja" );
+            bash_path                                 = add_tool( "bash", "bash" );
 #endif
             configure_qmake_path = add_tool( ext_dir / "configure_qmake" DMK_COMM_EXT, "configure_qmake" );
             build_qmake_path     = add_tool( ext_dir / "build_qmake" DMK_COMM_EXT, "build_qmake" );

@@ -69,7 +69,7 @@ cd /d %BUILDBIN%\tools
 )
 
 @echo Downloading CMake...
-%BUILDBIN%\tools\msys\usr\bin\curl.exe -o %BUILDBIN%\tools\cmake.zip -L https://cmake.org/files/v3.3/cmake-3.3.2-win32-x86.zip
+%BUILDBIN%\tools\msys\usr\bin\curl.exe -o %BUILDBIN%\tools\cmake.zip -L https://cmake.org/files/v3.4/cmake-3.4.1-win32-x86.zip
 if NOT '%ERRORLEVEL%'=='0' goto ERROR
 
 @echo Unpacking CMake...
@@ -77,9 +77,9 @@ mkdir %BUILDBIN%\tools\cmake
 %BUILDBIN%\tools\msys\usr\bin\bsdtar.exe -xf %BUILDBIN%\tools\cmake.zip --strip=1 -C %BUILDBIN%\tools\cmake
 if NOT '%ERRORLEVEL%'=='0' goto ERROR
 del /Q %BUILDBIN%\tools\cmake.zip
-del /Q %BUILDBIN%\tools\cmake\share\cmake-3.3\Modules\FindZLIB.cmake
-del /Q %BUILDBIN%\tools\cmake\share\cmake-3.3\Modules\FindFreetype.cmake
-del /Q %BUILDBIN%\tools\cmake\share\cmake-3.3\Modules\FindThreads.cmake
+::del /Q %BUILDBIN%\tools\cmake\share\cmake-3.3\Modules\FindZLIB.cmake
+::del /Q %BUILDBIN%\tools\cmake\share\cmake-3.3\Modules\FindFreetype.cmake
+::del /Q %BUILDBIN%\tools\cmake\share\cmake-3.3\Modules\FindThreads.cmake
 
 :SKIP_CMAKE
 
@@ -214,6 +214,23 @@ mkdir %BUILDBIN%\tools\ruby
 if NOT '%ERRORLEVEL%'=='0' goto ERROR
 del /Q %BUILDBIN%\tools\ruby.exe
 :SKIP_RUBY
+
+:: NINJA
+
+@if EXIST %BUILDBIN%\tools\ninja\ninja.exe (
+	echo Ninja is already installed, skipping
+	goto SKIP_NINJA
+)
+
+@echo Downloading ninja...
+%BUILDBIN%\tools\msys\usr\bin\curl.exe -o %BUILDBIN%\tools\ninja.zip -L https://github.com/ninja-build/ninja/releases/download/v1.6.0/ninja-win.zip
+if NOT '%ERRORLEVEL%'=='0' goto ERROR
+@echo Unpacking ninja...
+mkdir %BUILDBIN%\tools\ninja
+%BUILDBIN%\tools\msys\usr\bin\bsdtar.exe -xf %BUILDBIN%\tools\ninja.zip -C %BUILDBIN%\tools\ninja
+if NOT '%ERRORLEVEL%'=='0' goto ERROR
+del /Q %BUILDBIN%\tools\ninja.zip
+:SKIP_NINJA
 
 :: 7ZIP
 

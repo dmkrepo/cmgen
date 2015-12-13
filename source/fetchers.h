@@ -304,9 +304,24 @@ namespace dmk
         }
     };
 
+    class local_fetcher : public fetcher
+    {
+    protected:
+        using fetcher::fetcher;
+        friend class fetcher;
+        virtual void do_fetch( ) override
+        {
+            println( "Project {} is local. No need to download sources", m_project->name( ) );
+        }
+    };
+
     ptr<fetcher> fetcher::create( const project* proj, const json& package, const path& destination )
     {
-        if ( package.is_array( ) )
+        if ( package == "local" )
+        {
+            return ptr<fetcher>( new local_fetcher( proj, package, destination ) );
+        }
+        else if ( package.is_array( ) )
         {
             return ptr<fetcher>( new list_fetcher( proj, package, destination ) );
         }
@@ -317,6 +332,10 @@ namespace dmk
             if ( type == "" || type == "list" )
             {
                 return ptr<fetcher>( new list_fetcher( proj, package, destination ) );
+            }
+            else if ( type == "local" )
+            {
+                return ptr<fetcher>( new local_fetcher( proj, package, destination ) );
             }
             else if ( type == "git" )
             {

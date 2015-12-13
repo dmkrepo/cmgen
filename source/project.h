@@ -265,7 +265,10 @@ namespace dmk
 
         static void remove_imported( const std::string& name )
         {
-            remove_directory( env->source_root_dir / name );
+            if ( !is_local( name ) )
+            {
+                remove_directory( env->source_root_dir / name );
+            }
         }
         static void remove_configured( const std::string& name, const architecture& arch )
         {
@@ -301,10 +304,15 @@ namespace dmk
         }
         static void clear_imported( const std::string& name )
         {
-            remove_if_exists( flag_path( name, "imported" ) );
-            remove_imported( name );
             for ( auto a : env->archs )
+            {
                 clear_configured( name, a );
+            }
+            if ( !is_local( name ) )
+            {
+                remove_if_exists( flag_path( name, "imported" ) );
+                remove_imported( name );
+            }
         }
 
         static bool is_configured( const std::string& name, const architecture& arch )
@@ -324,12 +332,12 @@ namespace dmk
         }
         static void clear_configured( const std::string& name, const architecture& arch, bool clean = true )
         {
+            clear_built( name, arch, clean );
             remove_if_exists( flag_path( name, "configured", arch ) );
             if ( clean )
             {
                 remove_configured( name, arch );
             }
-            clear_built( name, arch, clean );
         }
 
         static bool is_built( const std::string& name, const architecture& arch )
@@ -367,6 +375,11 @@ namespace dmk
         static bool is_module( const std::string& name )
         {
             return is_file( module_path( name ) );
+        }
+
+        static bool is_local( const std::string& name )
+        {
+            return is_file( ( env->modules_dir / name ).string( ) + ".localproject" );
         }
 
         static void build_dependencies_list( std::vector<std::string>& list, const std::string& name )

@@ -452,19 +452,22 @@ namespace dmk
 
             std::vector<wchar_t> args;
             args.push_back( '"' );
+            args.push_back( '"' );
             std::wstring progr( m_program.wstring( ) );
             args.insert( args.end( ), progr.begin( ), progr.end( ) );
             args.push_back( '"' );
             args.push_back( ' ' );
             args.insert( args.end( ), m_args.begin( ), m_args.end( ) );
+            args.push_back( '"' );
             args.push_back( 0 );
             std::string ext = asci_lowercase( m_program.extension( ).string( ) );
-            if ( ext == "bat" || ext == "cmd" )
+            // if ( ext == "bat" || ext == "cmd" )
             {
                 std::wstring cmd = L"cmd.exe /S /C ";
                 args.insert( args.begin( ), cmd.begin( ), cmd.end( ) );
             }
             args.reserve( args.size( ) + 100 );
+
             std::vector<wchar_t> env;
             LPWCH current_env = GetEnvironmentStringsW( );
 
