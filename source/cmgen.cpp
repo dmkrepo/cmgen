@@ -148,10 +148,16 @@ namespace dmk
                     if ( !is_file( p.path( ).string( ) + ".applied" ) )
                     {
                         println( "Applying patch..." );
-                        exec<build_process>( proj->source_dir( ), env->patch_path, "-u -p0 -i {}", qo( p ) );
+                        exec<build_process>(
+                            proj->source_dir( ), env->patch_path, "-l -u -p0 -i {}", qo( p ) );
                         touch_file( p.path( ).string( ) + ".applied" );
                     }
                 }
+            }
+            if ( proj->data( ).has_key( "afterimport" ) )
+            {
+                std::string script = proj->data( )["afterimport"] || "";
+                exec<build_process>( proj->source_dir( ), proj->source_dir( ) / script, "" );
             }
         }
 
@@ -217,7 +223,7 @@ namespace dmk
             paths += entries( project->source_dir( ), "copying*" );
             paths += entries( project->source_dir( ), "lgpl*" );
 
-            if ( paths.empty( ) )
+            if ( paths.empty( ) && project->data( )["source"] != "local" )
             {
                 throw error( "Can't find license for project {}", project_name );
             }

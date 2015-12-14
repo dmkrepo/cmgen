@@ -344,7 +344,7 @@ namespace dmk
                 free( argv );
             }
         }
-        char** split_commandline( const char* exec, const char* cmdline, int* argc )
+        char** split_commandline( const char* cmdline, int* argc )
         {
             int i;
             char** argv = NULL;
@@ -359,14 +359,13 @@ namespace dmk
                 return NULL;
             }
             *argc = p.we_wordc;
-            if ( !( argv = ( char** )calloc( *argc + 2, sizeof( char* ) ) ) )
+            if ( !( argv = ( char** )calloc( *argc + 1, sizeof( char* ) ) ) )
             {
                 goto fail;
             }
-            argv[0] = strdup( exec );
             for ( i = 0; i < p.we_wordc; i++ )
             {
-                if ( !( argv[i + 1] = strdup( p.we_wordv[i] ) ) )
+                if ( !( argv[i] = strdup( p.we_wordv[i] ) ) )
                 {
                     goto fail;
                 }
@@ -387,14 +386,14 @@ namespace dmk
             before( );
 #if defined DMK_OS_POSIX
             pid_t pid;
-            std::string cmd  = m_program.string( ) + " " + m_args;
-            std::string prog = m_program.filename( ).string( );
+            std::string cmd  = "/bin/bash -c " + m_program.string( ) + " " + m_args;
+            std::string prog = "bash"; // m_program.filename( ).string( );
 
             path saved = current_path( );
             current_path( m_working_dir );
 
             int argc    = 0;
-            char** argv = split_commandline( prog.c_str( ), m_args.c_str( ), &argc );
+            char** argv = split_commandline( prog.c_str( ), cmd.c_str( ), &argc );
             char** envp = environ;
 
             m_exit_code = posix_spawn( &pid, m_program.string( ).c_str( ), NULL, NULL, argv, envp );

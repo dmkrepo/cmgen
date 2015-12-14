@@ -2,14 +2,18 @@
 
 set -e # exit if error
 
-which -s brew  || ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-which -s boost || brew install boost
-which -s cmake || brew install cmake
-which -s git   || brew install git
-which -s hg    || brew install hg
-which -s p7zip || brew install p7zip
-which -s scons || brew install scons
-which -s wget  || brew install wget
+which -s brew     || ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+which -s boost    || brew install boost
+which -s cmake    || brew install cmake
+which -s git      || brew install git
+which -s hg       || brew install hg
+which -s p7zip    || brew install p7zip
+which -s scons    || brew install scons
+which -s wget     || brew install wget
+which -s autoconf || brew install autoconf
+which -s automake || brew install automake
+which -s libtool  || brew install libtool
+
 
 BUILDBIN="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
