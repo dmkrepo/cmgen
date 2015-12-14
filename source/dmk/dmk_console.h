@@ -386,17 +386,17 @@ namespace dmk
             before( );
 #if defined DMK_OS_POSIX
             pid_t pid;
-            std::string cmd  = "/bin/bash -c " + m_program.string( ) + " " + m_args;
-            std::string prog = "bash"; // m_program.filename( ).string( );
+            std::string cmd  = "bash -c \"" + m_program.string( ) + " " + m_args + "\"";
+            //std::string prog = "bash"; // m_program.filename( ).string( );
 
             path saved = current_path( );
             current_path( m_working_dir );
 
             int argc    = 0;
-            char** argv = split_commandline( prog.c_str( ), cmd.c_str( ), &argc );
+            char** argv = split_commandline( cmd.c_str( ), &argc );
             char** envp = environ;
 
-            m_exit_code = posix_spawn( &pid, m_program.string( ).c_str( ), NULL, NULL, argv, envp );
+            m_exit_code = posix_spawn( &pid, "/bin/bash", NULL, NULL, argv, envp );
             if ( m_exit_code == 0 )
             {
                 waitpid( pid, &m_exit_code, 0 );

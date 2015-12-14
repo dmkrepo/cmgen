@@ -332,7 +332,7 @@ namespace dmk
                 println( "    bin_dir = {}", lib_dir.string( ) );
                 println( "    inc_dir = {}", inc_dir.string( ) );
                 println( "    out_dir = {}", out_dir.string( ) );
-                println( "data:\n{}", m_data.stringify( ) );
+                println( "data:\n{}", ctx.data.stringify( ) );
             }
 #endif
         }
@@ -415,8 +415,8 @@ namespace dmk
             cmake( "-G{}", qo( ctx.arch.generator ) );
             cmake( "--no-warn-unused-cli" );
 
-            std::string flags   = join_list( m_data["flags"], " " );
-            std::string defines = join_list( m_data["defines"], ";" );
+            std::string flags   = join_list( ctx.data["flags"], " " );
+            std::string defines = join_list( ctx.data["defines"], ";" );
 
             variable_list vars =
                 env->variables + m_project->public_variables( ctx.arch, ctx.config ) + dynamic_variables( );
@@ -431,7 +431,7 @@ namespace dmk
                 else
                     cmake.D( "CMGEN_" + asci_uppercase( var.first ), var.second );
             }
-            for ( const auto& opt : m_data["options"].as_object( ) )
+            for ( const auto& opt : ctx.data["options"].as_object( ) )
             {
                 if ( opt.second.is_bool( ) )
                 {
@@ -495,10 +495,12 @@ namespace dmk
         virtual void do_build( const context& ctx ) override
         {
             exec<build_process>(
-                ctx.configure_dir, env->scons_path, "{}", join( m_data["options"].flatten( ), " " ) );
+                ctx.configure_dir, env->scons_path, "{}", join( ctx.data["options"].flatten( ), " " ) );
 
-            exec<build_process>(
-                ctx.configure_dir, env->scons_path, "{} install", join( m_data["options"].flatten( ), " " ) );
+            exec<build_process>( ctx.configure_dir,
+                                 env->scons_path,
+                                 "{} install",
+                                 join( ctx.data["options"].flatten( ), " " ) );
         }
     };
 
@@ -519,7 +521,7 @@ namespace dmk
             variable_list list =
                 env->variables + m_project->public_variables( ctx.arch, ctx.config ) + dynamic_variables( );
             cmd.set_env( list.transform( "CMGEN_", "", text_case::upper ) );
-            cmd.set_env( "CMGEN_OPTIONS", join( m_data["options"].flatten( ), " " ) );
+            cmd.set_env( "CMGEN_OPTIONS", join( ctx.data["options"].flatten( ), " " ) );
             cmd( );
         }
         virtual void do_build( const context& ctx ) override
@@ -533,7 +535,7 @@ namespace dmk
             variable_list vars =
                 env->variables + m_project->public_variables( ctx.arch, ctx.config ) + dynamic_variables( );
             cmd.set_env( vars.transform( "CMGEN_", "", text_case::upper ) );
-            cmd.set_env( "CMGEN_OPTIONS", join( m_data["options"].flatten( ), " " ) );
+            cmd.set_env( "CMGEN_OPTIONS", join( ctx.data["options"].flatten( ), " " ) );
             cmd( );
         }
     };
@@ -553,12 +555,10 @@ namespace dmk
             path command = m_project->source_dir( ) / "configure";
             if ( !is_file( command ) )
                 throw error( "Can't file configure script: {}", command );
-            build_process cmd( env->bash_path, ctx.configure_dir );
+            build_process cmd( command, ctx.configure_dir );
+            cmd( "--prefix={}", m_project->output_dir( project::dir::install, ctx.arch, ctx.config ) );
 
-            cmd( "-c" );
-            cmd( command );
-
-            for ( const auto& o : m_data["options"].flatten( ) )
+            for ( const auto& o : ctx.data["options"].flatten( ) )
             {
                 cmd( o || "" );
             }
@@ -624,16 +624,16 @@ namespace dmk
         {
             return "command";
         }
-        if ( is_file( source / "CMakeLists.txt" ) )
-        {
-            return "cmake";
-        }
 #if defined DMK_OS_POSIX
         if ( is_file( source / "configure" ) )
         {
             return "configure";
         }
 #endif
+        if ( is_file( source / "CMakeLists.txt" ) )
+        {
+            return "cmake";
+        }
         if ( is_file( source / "SConstruct" ) )
         {
             return "scons";
